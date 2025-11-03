@@ -102,7 +102,10 @@ async function main() {
 
   const beats: Beat[] = [];
 
-  // 各セグメントを処理
+  // フェーズ1: 動画分割・文字起こし・翻訳・話者識別
+  console.log('\n📋 Phase 1: Transcription and Translation');
+  console.log('=========================================');
+
   for (let i = 0; i < segments.length; i++) {
     const segmentNum = i + 1;
     const segment = segments[i];
@@ -129,11 +132,6 @@ async function main() {
     console.log(`  ✅ Transcription (JA): ${multiLinguals.ja.substring(0, 80)}...`);
     console.log(`  ✅ Translation (EN): ${multiLinguals.en.substring(0, 80)}...`);
 
-    // 日本語音声を生成（TTS）
-    const jaAudioOutput = path.join(OUTPUT_DIR, `${segmentNum}_ja.mp3`);
-    console.log(`  🎤 Generating Japanese TTS audio...`);
-    await textToSpeech(multiLinguals.ja, jaAudioOutput, 'ja');
-
     // 話者識別を試みる（各セグメントに対して）
     console.log(`  👥 Identifying speakers...`);
     const speakerSegments = await identifySpeakers(multiLinguals.ja);
@@ -158,9 +156,38 @@ async function main() {
       endTime: segment.end,
       duration: duration,
     });
+
+    // 各セグメント処理後にJSONを保存（安全のため）
+    const output: Output = {
+      totalDuration: processDuration,
+      totalSegments: segments.length,
+      beats: beats,
+    };
+    await fs.writeFile(outputPath, JSON.stringify(output, null, 2), 'utf-8');
+    console.log(`  💾 Saved progress to ${path.basename(outputPath)}`);
   }
 
-  // 結果をJSONとして保存
+  // フェーズ2: TTS音声生成
+  console.log('\n\n🎤 Phase 2: Japanese TTS Audio Generation');
+  console.log('=========================================');
+
+  for (let i = 0; i < beats.length; i++) {
+    const segmentNum = i + 1;
+    const beat = beats[i];
+    const jaAudioOutput = path.join(OUTPUT_DIR, `${segmentNum}_ja.mp3`);
+
+    console.log(`\n🔊 Generating TTS for segment ${segmentNum}/${beats.length}...`);
+
+    try {
+      await fs.access(jaAudioOutput);
+      console.log(`  ♻️  Japanese TTS audio already exists, skipping`);
+    } catch {
+      console.log(`  🎤 Generating Japanese TTS audio...`);
+      await textToSpeech(beat.multiLinguals.ja, jaAudioOutput, 'ja');
+    }
+  }
+
+  // 最終結果をJSONとして保存
   const output: Output = {
     totalDuration: processDuration,
     totalSegments: segments.length,

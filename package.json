@@ -1,0 +1,32 @@
+{
+  "name": "ai",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "lint": "eslint src",
+    "start": "tsx src/index.ts",
+    "start:test": "tsx src/index.ts --test",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "MIT",
+  "description": "",
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "eslint": "^9.39.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "eslint-plugin-sonarjs": "^3.0.5",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.2"
+  },
+  "dependencies": {
+    "@types/fluent-ffmpeg": "^2.1.28",
+    "dotenv": "^17.2.3",
+    "fluent-ffmpeg": "^2.1.3",
+    "form-data": "^4.0.4",
+    "openai": "^6.7.0"
+  }
+}

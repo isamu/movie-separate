@@ -145,25 +145,31 @@ output/
   "totalSegments": 8,
   "beats": [
     {
-      "speaker": "話者A",
-      "text": {
-        "ja": "こんにちは、今日は...",
-        "en": "Hello, today..."
+      "text": "Hello, today we will talk about AI...",
+      "audioSources": {
+        "en": "1.mp3"
       },
-      "video": "1.mp4",
-      "audio": "1.mp3",
+      "multiLinguals": {
+        "ja": "こんにちは、今日はAIについて話します...",
+        "en": "Hello, today we will talk about AI..."
+      },
+      "videoSource": "1.mp4",
+      "speaker": "話者A",
       "startTime": 0,
       "endTime": 45.2,
       "duration": 45.2
     },
     {
-      "speaker": "話者B",
-      "text": {
+      "text": "Yes, nice to meet you...",
+      "audioSources": {
+        "en": "2.mp3"
+      },
+      "multiLinguals": {
         "ja": "はい、よろしくお願いします...",
         "en": "Yes, nice to meet you..."
       },
-      "video": "2.mp4",
-      "audio": "2.mp3",
+      "videoSource": "2.mp4",
+      "speaker": "話者B",
       "startTime": 45.2,
       "endTime": 98.7,
       "duration": 53.5
@@ -177,12 +183,14 @@ output/
 - `totalDuration`: 処理した動画の総時間（秒）
 - `totalSegments`: 分割されたセグメントの総数
 - `beats[]`: 各セグメントの情報
-  - `speaker`: 話者名（GPT-4oが識別）
-  - `text`: 文字起こしされたテキスト（日英両方）
+  - `text`: 英語テキスト（`multiLinguals.en`と同じ）
+  - `audioSources`: 音声ファイル
+    - `en`: 英語音声ファイル名
+  - `multiLinguals`: 多言語テキスト
     - `ja`: 日本語の文字起こし（Whisper API）
     - `en`: 英語翻訳（GPT-4o-mini）
-  - `video`: 動画ファイル名
-  - `audio`: 音声ファイル名
+  - `videoSource`: 動画ファイル名
+  - `speaker`: 話者名（GPT-4oが識別）
   - `startTime`: セグメント開始時刻（秒）
   - `endTime`: セグメント終了時刻（秒）
   - `duration`: セグメントの長さ（秒）

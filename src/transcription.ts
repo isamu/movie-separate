@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import { createReadStream } from 'fs';
-import { Beat, BilingualText } from './types.js';
+import { Beat, MultiLinguals } from './types.js';
 
 // OpenAIクライアントを遅延初期化
 let openai: OpenAI;
@@ -166,7 +166,7 @@ export async function translateToEnglish(japaneseText: string): Promise<string> 
 /**
  * 音声を文字起こしして日英両方のテキストを返す
  */
-export async function transcribeAudioBilingual(audioPath: string): Promise<BilingualText> {
+export async function transcribeAudioBilingual(audioPath: string): Promise<MultiLinguals> {
   const japaneseText = await transcribeAudio(audioPath);
   console.log(`    🌐 Translating to English...`);
   const englishText = await translateToEnglish(japaneseText);

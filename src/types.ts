@@ -1,16 +1,21 @@
-export interface BilingualText {
+export interface MultiLinguals {
   ja: string;
   en: string;
 }
 
+export interface AudioSources {
+  en: string;
+}
+
 export interface Beat {
-  speaker: string;
-  text: BilingualText;
-  video: string;
-  audio: string;
-  startTime: number;
-  endTime: number;
-  duration: number;
+  text: string; // 英語テキスト
+  audioSources: AudioSources;
+  multiLinguals: MultiLinguals;
+  videoSource: string;
+  speaker?: string; // オプション
+  startTime?: number; // オプション
+  endTime?: number; // オプション
+  duration?: number; // オプション
 }
 
 export interface Output {

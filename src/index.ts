@@ -103,13 +103,13 @@ async function main() {
 
     // 音声を文字起こし（日英両方）
     console.log(`  📝 Transcribing audio...`);
-    const bilingualText = await transcribeAudioBilingual(audioOutput);
-    console.log(`  ✅ Transcription (JA): ${bilingualText.ja.substring(0, 80)}...`);
-    console.log(`  ✅ Translation (EN): ${bilingualText.en.substring(0, 80)}...`);
+    const multiLinguals = await transcribeAudioBilingual(audioOutput);
+    console.log(`  ✅ Transcription (JA): ${multiLinguals.ja.substring(0, 80)}...`);
+    console.log(`  ✅ Translation (EN): ${multiLinguals.en.substring(0, 80)}...`);
 
     // 話者識別を試みる（各セグメントに対して）
     console.log(`  👥 Identifying speakers...`);
-    const speakerSegments = await identifySpeakers(bilingualText.ja);
+    const speakerSegments = await identifySpeakers(multiLinguals.ja);
 
     // このセグメントのbeatsを作成
     // 話者が複数いる場合は最初の話者を使用（簡略化）
@@ -119,10 +119,13 @@ async function main() {
         : 'Unknown Speaker';
 
     beats.push({
+      text: multiLinguals.en, // textは英語
+      audioSources: {
+        en: `${segmentNum}.mp3`,
+      },
+      multiLinguals: multiLinguals,
+      videoSource: `${segmentNum}.mp4`,
       speaker: mainSpeaker,
-      text: bilingualText,
-      video: `${segmentNum}.mp4`,
-      audio: `${segmentNum}.mp3`,
       startTime: segment.start,
       endTime: segment.end,
       duration: duration,

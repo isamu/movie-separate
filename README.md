@@ -8,6 +8,7 @@
 - **音声抽出**: 各セグメントから音声ファイル（MP3）を自動生成
 - **文字起こし**: OpenAI Whisper APIで高精度な日本語文字起こし
 - **自動翻訳**: GPT-4o-miniで日本語を英語に自動翻訳（日英両方を出力）
+- **日本語音声生成**: OpenAI TTS APIで翻訳テキストから日本語音声を生成
 - **翻訳キャッシュ**: 既存の翻訳を再利用してAPIコストを削減
 - **話者識別**: GPT-4oで会話から話者を自動識別
 - **構造化データ出力**: すべての情報をJSON形式で出力
@@ -118,6 +119,7 @@ npm start -- -t -i your-video.mp4
    - 音声ファイル（1.mp3, 2.mp3, ...）を抽出
    - Whisper APIで日本語文字起こし
    - GPT-4o-miniで英語に翻訳（キャッシュにある場合はスキップ）
+   - TTS APIで日本語音声ファイル（1_ja.mp3, 2_ja.mp3, ...）を生成
    - GPT-4oで話者を識別
 5. **JSON出力**: すべての情報を`output/mulmo_view.json`に保存
 
@@ -131,9 +133,11 @@ npm start -- -t -i your-video.mp4
 output/
 ├── mulmo_view.json   # メタデータと文字起こし結果
 ├── 1.mp4             # セグメント1の動画
-├── 1.mp3             # セグメント1の音声
+├── 1.mp3             # セグメント1の音声（元の英語）
+├── 1_ja.mp3          # セグメント1の日本語TTS音声
 ├── 2.mp4             # セグメント2の動画
-├── 2.mp3             # セグメント2の音声
+├── 2.mp3             # セグメント2の音声（元の英語）
+├── 2_ja.mp3          # セグメント2の日本語TTS音声
 └── ...
 ```
 
@@ -149,7 +153,8 @@ output/
     {
       "text": "Hello, today we will talk about AI...",
       "audioSources": {
-        "en": "1.mp3"
+        "en": "1.mp3",
+        "ja": "1_ja.mp3"
       },
       "multiLinguals": {
         "ja": "こんにちは、今日はAIについて話します...",
@@ -164,7 +169,8 @@ output/
     {
       "text": "Yes, nice to meet you...",
       "audioSources": {
-        "en": "2.mp3"
+        "en": "2.mp3",
+        "ja": "2_ja.mp3"
       },
       "multiLinguals": {
         "ja": "はい、よろしくお願いします...",
@@ -187,7 +193,8 @@ output/
 - `beats[]`: 各セグメントの情報
   - `text`: 英語テキスト（`multiLinguals.en`と同じ）
   - `audioSources`: 音声ファイル
-    - `en`: 英語音声ファイル名
+    - `en`: 元の英語音声ファイル名（動画から抽出）
+    - `ja`: 日本語TTS音声ファイル名（OpenAI TTS APIで生成）
   - `multiLinguals`: 多言語テキスト
     - `ja`: 日本語の文字起こし（Whisper API）
     - `en`: 英語翻訳（GPT-4o-mini）
@@ -278,11 +285,13 @@ npm run start:test
 OpenAI APIの料金（2024年11月時点）：
 
 - **Whisper API**: $0.006 / 分
+- **TTS API**: $15.00 / 1M文字
 - **GPT-4o-mini API** (翻訳): $0.15 / 1M入力トークン、$0.60 / 1M出力トークン
 - **GPT-4o API** (話者識別): $2.50 / 1M入力トークン、$10.00 / 1M出力トークン
 
-例: 30分の動画（8セグメント）の場合
+例: 30分の動画（8セグメント、約2000文字の日本語テキスト）の場合
 - Whisper: 約 $0.18
+- TTS (日本語音声生成): 約 $0.03
 - GPT-4o-mini (翻訳): 約 $0.10〜$0.30
 - GPT-4o (話者識別): 約 $0.50〜$2.00
 - **合計**: 約 $0.80〜$2.50

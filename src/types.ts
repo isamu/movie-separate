@@ -5,6 +5,7 @@ export interface MultiLinguals {
 
 export interface AudioSources {
   en: string;
+  ja: string;
 }
 
 export interface Beat {

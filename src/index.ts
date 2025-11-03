@@ -9,7 +9,7 @@ import {
   getVideoDuration,
 } from './ffmpeg-utils.js';
 import { segmentVideo } from './segmentation.js';
-import { transcribeAudioBilingual, identifySpeakers } from './transcription.js';
+import { transcribeAudioBilingual, identifySpeakers, textToSpeech } from './transcription.js';
 import { Beat, Output } from './types.js';
 
 dotenv.config();
@@ -129,6 +129,11 @@ async function main() {
     console.log(`  ✅ Transcription (JA): ${multiLinguals.ja.substring(0, 80)}...`);
     console.log(`  ✅ Translation (EN): ${multiLinguals.en.substring(0, 80)}...`);
 
+    // 日本語音声を生成（TTS）
+    const jaAudioOutput = path.join(OUTPUT_DIR, `${segmentNum}_ja.mp3`);
+    console.log(`  🎤 Generating Japanese TTS audio...`);
+    await textToSpeech(multiLinguals.ja, jaAudioOutput, 'ja');
+
     // 話者識別を試みる（各セグメントに対して）
     console.log(`  👥 Identifying speakers...`);
     const speakerSegments = await identifySpeakers(multiLinguals.ja);
@@ -144,6 +149,7 @@ async function main() {
       text: multiLinguals.en, // textは英語
       audioSources: {
         en: `${segmentNum}.mp3`,
+        ja: `${segmentNum}_ja.mp3`,
       },
       multiLinguals: multiLinguals,
       videoSource: `${segmentNum}.mp4`,

@@ -188,3 +188,34 @@ export async function transcribeAudioBilingual(
     en: englishText,
   };
 }
+
+/**
+ * テキストから音声を生成（TTS）
+ */
+export async function textToSpeech(
+  text: string,
+  outputPath: string,
+  language: 'ja' | 'en' = 'ja'
+): Promise<void> {
+  try {
+    const client = getOpenAIClient();
+
+    // 言語に応じて音声を選択
+    const voice = language === 'ja' ? 'alloy' : 'alloy'; // OpenAI TTSは多言語対応
+
+    const mp3 = await client.audio.speech.create({
+      model: 'tts-1',
+      voice: voice,
+      input: text,
+    });
+
+    const buffer = Buffer.from(await mp3.arrayBuffer());
+    const fs = await import('fs/promises');
+    await fs.writeFile(outputPath, buffer);
+
+    console.log(`    🔊 Generated ${language.toUpperCase()} audio: ${outputPath}`);
+  } catch (error) {
+    console.warn(`Failed to generate TTS for ${language}:`, error);
+    throw error;
+  }
+}

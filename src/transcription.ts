@@ -165,11 +165,23 @@ export async function translateToEnglish(japaneseText: string): Promise<string> 
 
 /**
  * 音声を文字起こしして日英両方のテキストを返す
+ * 翻訳キャッシュがある場合は再翻訳をスキップ
  */
-export async function transcribeAudioBilingual(audioPath: string): Promise<MultiLinguals> {
+export async function transcribeAudioBilingual(
+  audioPath: string,
+  translationCache?: Map<string, string>
+): Promise<MultiLinguals> {
   const japaneseText = await transcribeAudio(audioPath);
-  console.log(`    🌐 Translating to English...`);
-  const englishText = await translateToEnglish(japaneseText);
+
+  // キャッシュをチェック
+  let englishText: string;
+  if (translationCache && translationCache.has(japaneseText)) {
+    englishText = translationCache.get(japaneseText)!;
+    console.log(`    ♻️  Using cached translation`);
+  } else {
+    console.log(`    🌐 Translating to English...`);
+    englishText = await translateToEnglish(japaneseText);
+  }
 
   return {
     ja: japaneseText,

@@ -45,6 +45,28 @@ async function main() {
   // 出力ディレクトリを作成
   await ensureOutputDir(OUTPUT_DIR);
 
+  // 既存の翻訳をロード（存在する場合）
+  const outputPath = path.join(OUTPUT_DIR, 'mulmo_view.json');
+  const existingTranslations = new Map<string, string>(); // 日本語 -> 英語のマッピング
+
+  try {
+    const existingData = await fs.readFile(outputPath, 'utf-8');
+    const existingOutput: Output = JSON.parse(existingData);
+
+    for (const beat of existingOutput.beats) {
+      if (beat.multiLinguals?.ja && beat.multiLinguals?.en) {
+        existingTranslations.set(beat.multiLinguals.ja, beat.multiLinguals.en);
+      }
+    }
+
+    if (existingTranslations.size > 0) {
+      console.log(`♻️  Loaded ${existingTranslations.size} existing translations from cache`);
+    }
+  } catch (error) {
+    // ファイルが存在しない場合は無視
+    console.log('📝 No existing translations found, starting fresh');
+  }
+
   // 動画の全体の長さを取得
   const totalDuration = await getVideoDuration(INPUT_VIDEO);
   const processDuration = TEST_MODE ? Math.min(totalDuration, TEST_DURATION) : totalDuration;
@@ -101,9 +123,9 @@ async function main() {
     console.log(`  🎵 Extracting audio...`);
     await splitAudio(INPUT_VIDEO, audioOutput, segment.start, duration);
 
-    // 音声を文字起こし（日英両方）
+    // 音声を文字起こし（日英両方、キャッシュを使用）
     console.log(`  📝 Transcribing audio...`);
-    const multiLinguals = await transcribeAudioBilingual(audioOutput);
+    const multiLinguals = await transcribeAudioBilingual(audioOutput, existingTranslations);
     console.log(`  ✅ Transcription (JA): ${multiLinguals.ja.substring(0, 80)}...`);
     console.log(`  ✅ Translation (EN): ${multiLinguals.en.substring(0, 80)}...`);
 
@@ -138,7 +160,6 @@ async function main() {
     totalSegments: segments.length,
     beats: beats,
   };
-  const outputPath = path.join(OUTPUT_DIR, 'transcript.json');
   await fs.writeFile(outputPath, JSON.stringify(output, null, 2), 'utf-8');
 
   console.log(`\n✨ Processing complete!`);

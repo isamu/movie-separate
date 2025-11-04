@@ -43,11 +43,16 @@ async function main() {
     console.log('🧪 TEST MODE: Processing first 5 minutes only');
   }
 
-  // 出力ディレクトリを作成
-  await ensureOutputDir(OUTPUT_DIR);
+  // 入力動画ファイル名から拡張子を除いたベース名を取得
+  const videoBaseName = path.basename(INPUT_VIDEO, path.extname(INPUT_VIDEO));
+
+  // 出力ディレクトリを動画名に基づいて作成 (例: output/ai/)
+  const videoOutputDir = path.join(OUTPUT_DIR, videoBaseName);
+  await ensureOutputDir(videoOutputDir);
+  console.log(`📁 Output directory: ${videoOutputDir}`);
 
   // 既存の翻訳をロード（存在する場合）
-  const outputPath = path.join(OUTPUT_DIR, 'mulmo_view.json');
+  const outputPath = path.join(videoOutputDir, 'mulmo_view.json');
   const existingTranslations = new Map<string, string>(); // 日本語 -> 英語のマッピング
 
   try {
@@ -116,15 +121,15 @@ async function main() {
       `\n🎞️  Processing segment ${segmentNum}/${segments.length} (${segment.start.toFixed(1)}s - ${segment.end.toFixed(1)}s, duration: ${duration.toFixed(1)}s)...`
     );
 
-    const videoOutput = path.join(OUTPUT_DIR, `${segmentNum}.mp4`);
-    const audioOutput = path.join(OUTPUT_DIR, `${segmentNum}.mp3`);
+    const videoOutput = path.join(videoOutputDir, `${segmentNum}.mp4`);
+    const audioOutput = path.join(videoOutputDir, `${segmentNum}.mp3`);
 
     // 動画を分割
     console.log(`  📹 Splitting video...`);
     await splitVideo(INPUT_VIDEO, videoOutput, segment.start, duration);
 
     // サムネイル画像を生成
-    const thumbnailOutput = path.join(OUTPUT_DIR, `${segmentNum}.jpg`);
+    const thumbnailOutput = path.join(videoOutputDir, `${segmentNum}.jpg`);
     console.log(`  🖼️  Generating thumbnail...`);
     await generateThumbnail(videoOutput, thumbnailOutput, 0);
 
@@ -181,7 +186,7 @@ async function main() {
   for (let i = 0; i < beats.length; i++) {
     const segmentNum = i + 1;
     const beat = beats[i];
-    const jaAudioOutput = path.join(OUTPUT_DIR, `${segmentNum}_ja.mp3`);
+    const jaAudioOutput = path.join(videoOutputDir, `${segmentNum}_ja.mp3`);
 
     console.log(`\n🔊 Generating TTS for segment ${segmentNum}/${beats.length}...`);
 
@@ -204,7 +209,7 @@ async function main() {
 
   console.log(`\n✨ Processing complete!`);
   console.log(`📄 Results saved to ${outputPath}`);
-  console.log(`📁 Video and audio files saved in ${OUTPUT_DIR}/`);
+  console.log(`📁 Video and audio files saved in ${videoOutputDir}/`);
   console.log(`\n📈 Summary:`);
   console.log(`   Total duration: ${processDuration.toFixed(2)}s`);
   console.log(`   Total segments: ${segments.length}`);

@@ -130,67 +130,78 @@ async function main() {
 
     const videoOutput = path.join(videoOutputDir, `${segmentNum}.mp4`);
     const audioOutput = path.join(videoOutputDir, `${segmentNum}.mp3`);
+    const thumbnailOutput = path.join(videoOutputDir, `${segmentNum}.jpg`);
     const videoFileName = `${segmentNum}.mp4`;
 
-    // キャッシュをチェック - すべてのファイルが存在する場合はスキップ
+    // キャッシュされたデータを取得
     const cachedBeat = existingBeatsCache.get(videoFileName);
-    const thumbnailOutput = path.join(videoOutputDir, `${segmentNum}.jpg`);
 
-    if (cachedBeat) {
-      // すべての必要なファイルが存在するか確認
-      try {
-        await Promise.all([
-          fs.access(videoOutput),
-          fs.access(audioOutput),
-          fs.access(thumbnailOutput),
-        ]);
-
-        console.log(`  ♻️  All files exist, using cached data`);
-        beats.push(cachedBeat);
-
-        // 進捗を保存
-        const output: Output = {
-          totalDuration: processDuration,
-          totalSegments: segments.length,
-          beats: beats,
-        };
-        await fs.writeFile(outputPath, JSON.stringify(output, null, 2), 'utf-8');
-        console.log(`  💾 Saved progress to ${path.basename(outputPath)}`);
-        continue; // 次のセグメントへ
-      } catch {
-        // ファイルが存在しない場合は通常処理を続行
-        console.log(`  ⚠️  Cache exists but files missing, regenerating...`);
-      }
+    // 動画ファイルとサムネイルが存在しない場合のみ生成
+    let shouldGenerateVideo = true;
+    try {
+      await fs.access(videoOutput);
+      await fs.access(thumbnailOutput);
+      console.log(`  ♻️  Video and thumbnail already exist, skipping generation`);
+      shouldGenerateVideo = false;
+    } catch {
+      // ファイルが存在しない場合は生成
     }
 
-    // 動画を分割
-    console.log(`  📹 Splitting video...`);
-    await splitVideo(INPUT_VIDEO, videoOutput, segment.start, duration);
+    if (shouldGenerateVideo) {
+      // 動画を分割
+      console.log(`  📹 Splitting video...`);
+      await splitVideo(INPUT_VIDEO, videoOutput, segment.start, duration);
 
-    // サムネイル画像を生成
-    console.log(`  🖼️  Generating thumbnail...`);
-    await generateThumbnail(videoOutput, thumbnailOutput, 0);
+      // サムネイル画像を生成
+      console.log(`  🖼️  Generating thumbnail...`);
+      await generateThumbnail(videoOutput, thumbnailOutput, 0);
+    }
 
-    // 音声を抽出
-    console.log(`  🎵 Extracting audio...`);
-    await splitAudio(INPUT_VIDEO, audioOutput, segment.start, duration);
+    // 音声ファイルが存在しない場合のみ抽出（Whisper APIの課金対象）
+    let shouldExtractAudio = true;
+    try {
+      await fs.access(audioOutput);
+      console.log(`  ♻️  Audio file already exists, skipping extraction`);
+      shouldExtractAudio = false;
+    } catch {
+      // ファイルが存在しない場合は抽出
+    }
 
-    // 音声を文字起こし（日英両方、キャッシュを使用）
-    console.log(`  📝 Transcribing audio...`);
-    const multiLinguals = await transcribeAudioBilingual(audioOutput, existingTranslations);
-    console.log(`  ✅ Transcription (JA): ${multiLinguals.ja.substring(0, 80)}...`);
-    console.log(`  ✅ Translation (EN): ${multiLinguals.en.substring(0, 80)}...`);
+    if (shouldExtractAudio) {
+      console.log(`  🎵 Extracting audio...`);
+      await splitAudio(INPUT_VIDEO, audioOutput, segment.start, duration);
+    }
 
-    // 話者識別を試みる（各セグメントに対して）
-    console.log(`  👥 Identifying speakers...`);
-    const speakerSegments = await identifySpeakers(multiLinguals.ja);
+    // 文字起こしと翻訳（Whisper API + Translation APIの課金対象）
+    let multiLinguals: MultiLinguals;
+    if (cachedBeat && cachedBeat.multiLinguals?.ja && cachedBeat.multiLinguals?.en) {
+      // キャッシュされたテキストデータがある場合はスキップ
+      console.log(`  ♻️  Transcription and translation cached, skipping Whisper & Translation API`);
+      multiLinguals = cachedBeat.multiLinguals;
+    } else {
+      // 音声を文字起こし（日英両方、キャッシュを使用）
+      console.log(`  📝 Transcribing audio...`);
+      multiLinguals = await transcribeAudioBilingual(audioOutput, existingTranslations);
+      console.log(`  ✅ Transcription (JA): ${multiLinguals.ja.substring(0, 80)}...`);
+      console.log(`  ✅ Translation (EN): ${multiLinguals.en.substring(0, 80)}...`);
+    }
 
-    // このセグメントのbeatsを作成
-    // 話者が複数いる場合は最初の話者を使用（簡略化）
-    const mainSpeaker =
-      speakerSegments.length > 0
-        ? speakerSegments[0].speaker
-        : 'Unknown Speaker';
+    // 話者識別（GPT-4o APIの課金対象）
+    let mainSpeaker: string;
+    if (cachedBeat && cachedBeat.speaker) {
+      // キャッシュされた話者情報がある場合はスキップ
+      console.log(`  ♻️  Speaker identification cached, skipping GPT-4o API`);
+      mainSpeaker = cachedBeat.speaker;
+    } else {
+      // 話者識別を試みる（各セグメントに対して）
+      console.log(`  👥 Identifying speakers...`);
+      const speakerSegments = await identifySpeakers(multiLinguals.ja);
+      // 話者が複数いる場合は最初の話者を使用（簡略化）
+      mainSpeaker =
+        speakerSegments.length > 0
+          ? speakerSegments[0].speaker
+          : 'Unknown Speaker';
+    }
 
     beats.push({
       text: multiLinguals.en, // textは英語
@@ -226,11 +237,12 @@ async function main() {
     const beat = beats[i];
     const jaAudioOutput = path.join(videoOutputDir, `${segmentNum}_ja.mp3`);
 
-    console.log(`\n🔊 Generating TTS for segment ${segmentNum}/${beats.length}...`);
+    console.log(`\n🔊 Processing TTS for segment ${segmentNum}/${beats.length}...`);
 
+    // TTS音声ファイルが存在しない場合のみ生成（TTS APIの課金対象）
     try {
       await fs.access(jaAudioOutput);
-      console.log(`  ♻️  Japanese TTS audio already exists, skipping`);
+      console.log(`  ♻️  Japanese TTS audio already exists, skipping TTS API`);
     } catch {
       console.log(`  🎤 Generating Japanese TTS audio...`);
       await textToSpeech(beat.multiLinguals.ja, jaAudioOutput, 'ja');

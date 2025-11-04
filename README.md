@@ -116,6 +116,7 @@ npm start -- -t -i your-video.mp4
 3. **セグメント作成**: 20秒〜2分の範囲で、無音部分で分割
 4. **各セグメントの処理**:
    - 動画ファイル（1.mp4, 2.mp4, ...）を生成
+   - サムネイル画像（1.jpg, 2.jpg, ...）を生成
    - 音声ファイル（1.mp3, 2.mp3, ...）を抽出
    - Whisper APIで日本語文字起こし
    - GPT-4o-miniで英語に翻訳（キャッシュにある場合はスキップ）
@@ -133,9 +134,11 @@ npm start -- -t -i your-video.mp4
 output/
 ├── mulmo_view.json   # メタデータと文字起こし結果
 ├── 1.mp4             # セグメント1の動画
+├── 1.jpg             # セグメント1のサムネイル画像
 ├── 1.mp3             # セグメント1の音声（元の英語）
 ├── 1_ja.mp3          # セグメント1の日本語TTS音声
 ├── 2.mp4             # セグメント2の動画
+├── 2.jpg             # セグメント2のサムネイル画像
 ├── 2.mp3             # セグメント2の音声（元の英語）
 ├── 2_ja.mp3          # セグメント2の日本語TTS音声
 └── ...
@@ -161,6 +164,7 @@ output/
         "en": "Hello, today we will talk about AI..."
       },
       "videoSource": "1.mp4",
+      "thumbnail": "1.jpg",
       "speaker": "話者A",
       "startTime": 0,
       "endTime": 45.2,
@@ -177,6 +181,7 @@ output/
         "en": "Yes, nice to meet you..."
       },
       "videoSource": "2.mp4",
+      "thumbnail": "2.jpg",
       "speaker": "話者B",
       "startTime": 45.2,
       "endTime": 98.7,
@@ -199,6 +204,7 @@ output/
     - `ja`: 日本語の文字起こし（Whisper API）
     - `en`: 英語翻訳（GPT-4o-mini）
   - `videoSource`: 動画ファイル名
+  - `thumbnail`: サムネイル画像ファイル名（動画の最初のフレーム、640px幅）
   - `speaker`: 話者名（GPT-4oが識別）
   - `startTime`: セグメント開始時刻（秒）
   - `endTime`: セグメント終了時刻（秒）

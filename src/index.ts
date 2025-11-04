@@ -7,6 +7,7 @@ import {
   splitVideo,
   splitAudio,
   getVideoDuration,
+  generateThumbnail,
 } from './ffmpeg-utils.js';
 import { segmentVideo } from './segmentation.js';
 import { transcribeAudioBilingual, identifySpeakers, textToSpeech } from './transcription.js';
@@ -122,6 +123,11 @@ async function main() {
     console.log(`  📹 Splitting video...`);
     await splitVideo(INPUT_VIDEO, videoOutput, segment.start, duration);
 
+    // サムネイル画像を生成
+    const thumbnailOutput = path.join(OUTPUT_DIR, `${segmentNum}.jpg`);
+    console.log(`  🖼️  Generating thumbnail...`);
+    await generateThumbnail(videoOutput, thumbnailOutput, 0);
+
     // 音声を抽出
     console.log(`  🎵 Extracting audio...`);
     await splitAudio(INPUT_VIDEO, audioOutput, segment.start, duration);
@@ -151,6 +157,7 @@ async function main() {
       },
       multiLinguals: multiLinguals,
       videoSource: `${segmentNum}.mp4`,
+      thumbnail: `${segmentNum}.jpg`,
       speaker: mainSpeaker,
       startTime: segment.start,
       endTime: segment.end,

@@ -74,3 +74,27 @@ export async function ensureOutputDir(dirPath: string): Promise<void> {
     await fs.mkdir(dirPath, { recursive: true });
   }
 }
+
+/**
+ * 動画からサムネイル画像を生成
+ * @param videoPath 入力動画ファイルのパス
+ * @param outputPath 出力画像ファイルのパス
+ * @param timestamp サムネイルを取得する時間（秒）、デフォルトは最初のフレーム
+ */
+export async function generateThumbnail(
+  videoPath: string,
+  outputPath: string,
+  timestamp: number = 0
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    ffmpeg(videoPath)
+      .screenshots({
+        timestamps: [timestamp],
+        filename: path.basename(outputPath),
+        folder: path.dirname(outputPath),
+        size: '640x?', // 幅640px、高さは自動
+      })
+      .on('end', () => resolve())
+      .on('error', (err) => reject(err));
+  });
+}

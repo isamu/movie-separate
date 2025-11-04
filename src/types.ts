@@ -13,6 +13,7 @@ export interface Beat {
   audioSources: AudioSources;
   multiLinguals: MultiLinguals;
   videoSource: string;
+  thumbnail?: string; // サムネイル画像ファイル名
   speaker?: string; // オプション
   startTime?: number; // オプション
   endTime?: number; // オプション

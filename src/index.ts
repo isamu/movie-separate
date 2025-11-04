@@ -51,26 +51,33 @@ async function main() {
   await ensureOutputDir(videoOutputDir);
   console.log(`📁 Output directory: ${videoOutputDir}`);
 
-  // 既存の翻訳をロード（存在する場合）
+  // 既存のデータをロード（存在する場合）
   const outputPath = path.join(videoOutputDir, 'mulmo_view.json');
   const existingTranslations = new Map<string, string>(); // 日本語 -> 英語のマッピング
+  const existingBeatsCache = new Map<string, Beat>(); // ファイル名 -> Beat のマッピング
 
   try {
     const existingData = await fs.readFile(outputPath, 'utf-8');
     const existingOutput: Output = JSON.parse(existingData);
 
     for (const beat of existingOutput.beats) {
+      // 翻訳キャッシュ
       if (beat.multiLinguals?.ja && beat.multiLinguals?.en) {
         existingTranslations.set(beat.multiLinguals.ja, beat.multiLinguals.en);
       }
+      // Beat全体のキャッシュ（ファイル名をキーに）
+      if (beat.videoSource) {
+        existingBeatsCache.set(beat.videoSource, beat);
+      }
     }
 
-    if (existingTranslations.size > 0) {
-      console.log(`♻️  Loaded ${existingTranslations.size} existing translations from cache`);
+    if (existingBeatsCache.size > 0) {
+      console.log(`♻️  Loaded ${existingBeatsCache.size} existing segments from cache`);
+      console.log(`   - ${existingTranslations.size} translations`);
     }
   } catch (error) {
     // ファイルが存在しない場合は無視
-    console.log('📝 No existing translations found, starting fresh');
+    console.log('📝 No existing cache found, starting fresh');
   }
 
   // 動画の全体の長さを取得
@@ -123,13 +130,44 @@ async function main() {
 
     const videoOutput = path.join(videoOutputDir, `${segmentNum}.mp4`);
     const audioOutput = path.join(videoOutputDir, `${segmentNum}.mp3`);
+    const videoFileName = `${segmentNum}.mp4`;
+
+    // キャッシュをチェック - すべてのファイルが存在する場合はスキップ
+    const cachedBeat = existingBeatsCache.get(videoFileName);
+    const thumbnailOutput = path.join(videoOutputDir, `${segmentNum}.jpg`);
+
+    if (cachedBeat) {
+      // すべての必要なファイルが存在するか確認
+      try {
+        await Promise.all([
+          fs.access(videoOutput),
+          fs.access(audioOutput),
+          fs.access(thumbnailOutput),
+        ]);
+
+        console.log(`  ♻️  All files exist, using cached data`);
+        beats.push(cachedBeat);
+
+        // 進捗を保存
+        const output: Output = {
+          totalDuration: processDuration,
+          totalSegments: segments.length,
+          beats: beats,
+        };
+        await fs.writeFile(outputPath, JSON.stringify(output, null, 2), 'utf-8');
+        console.log(`  💾 Saved progress to ${path.basename(outputPath)}`);
+        continue; // 次のセグメントへ
+      } catch {
+        // ファイルが存在しない場合は通常処理を続行
+        console.log(`  ⚠️  Cache exists but files missing, regenerating...`);
+      }
+    }
 
     // 動画を分割
     console.log(`  📹 Splitting video...`);
     await splitVideo(INPUT_VIDEO, videoOutput, segment.start, duration);
 
     // サムネイル画像を生成
-    const thumbnailOutput = path.join(videoOutputDir, `${segmentNum}.jpg`);
     console.log(`  🖼️  Generating thumbnail...`);
     await generateThumbnail(videoOutput, thumbnailOutput, 0);
 

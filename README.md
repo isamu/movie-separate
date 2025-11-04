@@ -11,6 +11,8 @@
 - **日本語音声生成**: OpenAI TTS APIで翻訳テキストから日本語音声を生成
 - **翻訳キャッシュ**: 既存の翻訳を再利用してAPIコストを削減
 - **話者識別**: GPT-4oで会話から話者を自動識別
+- **🆕 重要度評価**: GPT-4oで各セグメントの重要度を自動評価（0-10スコア、カテゴリ、要約付き）
+- **🆕 ダイジェスト生成**: 重要なセグメントのみを抽出したダイジェスト機能
 - **構造化データ出力**: すべての情報をJSON形式で出力
 
 ## 必要な環境
@@ -109,6 +111,22 @@ npm start -- --test --input your-video.mp4
 npm start -- -t -i your-video.mp4
 ```
 
+### 評価のみを実行
+
+既にテキストデータがある場合、評価だけを再実行できます：
+
+```bash
+npm run evaluate output/ai/mulmo_view.json
+```
+
+この評価専用コマンドは：
+- 既存の`mulmo_view.json`から日本語テキストを読み込み
+- GPT-4oで全セグメントの重要度を評価
+- 未来予測、意外な回答、専門的な洞察を高く評価
+- 評価結果を同じファイルに上書き保存
+
+**注意**: 評価はLLMの性質上、実行ごとに若干異なる結果になる可能性があります。満足いく結果が得られるまで何度か実行することをお勧めします。
+
 ## 処理の流れ
 
 1. **キャッシュのロード**: `output/{動画名}/mulmo_view.json`から既存データを読み込み
@@ -124,7 +142,11 @@ npm start -- -t -i your-video.mp4
    - 各セグメント処理後にJSONを保存（クラッシュ時の安全性）
 5. **フェーズ2: 日本語TTS音声生成**:
    - **TTS音声**: `{n}_ja.mp3`が存在すればスキップ、なければTTS APIで生成
-6. **JSON出力**: すべての情報を`output/{動画名}/mulmo_view.json`に保存
+6. **🆕 フェーズ3: セグメント重要度評価**:
+   - JSONに評価データ（importance, category, summary）があればスキップ
+   - なければ全セグメントのテキストをGPT-4oに送信し一括評価
+   - 各セグメントに重要度スコア（0-10）、カテゴリ、要約を追加
+7. **JSON出力**: すべての情報を`output/{動画名}/mulmo_view.json`に保存
 
 ## 出力
 
@@ -181,7 +203,10 @@ output/
       "speaker": "話者A",
       "startTime": 0,
       "endTime": 45.2,
-      "duration": 45.2
+      "duration": 45.2,
+      "importance": 9,
+      "category": "introduction",
+      "summary": "AIに関する対談の導入部分"
     },
     {
       "text": "Yes, nice to meet you...",
@@ -198,7 +223,10 @@ output/
       "speaker": "話者B",
       "startTime": 45.2,
       "endTime": 98.7,
-      "duration": 53.5
+      "duration": 53.5,
+      "importance": 3,
+      "category": "tangent",
+      "summary": "挨拶と自己紹介"
     }
   ]
 }
@@ -222,6 +250,9 @@ output/
   - `startTime`: セグメント開始時刻（秒）
   - `endTime`: セグメント終了時刻（秒）
   - `duration`: セグメントの長さ（秒）
+  - `importance`: 🆕 重要度スコア（0-10、10が最重要）
+  - `category`: 🆕 カテゴリ（key_point, introduction, explanation, example, discussion, conclusion, tangent, transition）
+  - `summary`: 🆕 セグメントの要約（日本語、1-2文）
 
 ## 分割アルゴリズム
 
@@ -233,6 +264,103 @@ output/
    - 2分を超える場合は、2分に近い無音部分で分割
    - 無音の中点で分割（音声が途切れないように）
 3. **フォールバック**: 無音が検出されない場合は、60秒ごとに固定分割
+
+## 🆕 重要度評価とダイジェスト
+
+### 重要度評価
+
+フェーズ3で、GPT-4oが全セグメントを一括評価し、各セグメントに以下を付与：
+
+- **importance（0-10）**: 内容の重要性スコア
+  - 10: 最も重要な結論、核心的な主張
+  - 7-9: 重要なポイント、キーとなる説明
+  - 4-6: 補足的な説明、具体例
+  - 1-3: 雑談、挨拶、脱線
+  - 0: 無意味な内容
+
+- **category**: セグメントのカテゴリ
+  - `key_point`: 重要な主張や結論
+  - `introduction`: 話題の導入
+  - `explanation`: 詳細な解説
+  - `example`: 具体例や事例
+  - `discussion`: 意見交換
+  - `conclusion`: まとめ
+  - `tangent`: 本題から外れた雑談
+  - `transition`: 話題の切り替え
+
+- **summary**: セグメントの簡潔な要約（日本語、1-2文）
+
+### ダイジェストの作成
+
+内蔵のダイジェスト生成ツールを使用：
+
+```bash
+# デフォルト（重要度7以上を抽出）
+npm run digest output/ai/mulmo_view.json
+
+# 重要度の閾値をカスタマイズ（例: 5以上）
+npm run digest output/ai/mulmo_view.json 5
+```
+
+出力例：
+
+```
+✨ Digest generated successfully!
+📄 Saved to: output/ai/digest.json
+
+📊 Summary:
+   Video: ai
+   Total Duration: 74:20
+   Total Segments: 141
+   Digest Segments: 15 (importance >= 7)
+   Compression: 89.4%
+
+🎯 Highlights:
+
+1. [2:09] 話者A (importance: 7)
+   Category: explanation
+   Summary: アメリカの再生産業とマイクロソフトの投資について。
+
+2. [5:30] 話者B (importance: 9)
+   Category: key_point
+   Summary: AIの今後の展開における重要な決定事項。
+```
+
+生成される`digest.json`の構造：
+
+```json
+{
+  "videoName": "ai",
+  "totalDuration": "74:20",
+  "totalSegments": 141,
+  "digestSegments": 15,
+  "compressionRatio": "89.4%",
+  "highlights": [
+    {
+      "segmentNumber": 6,
+      "videoSource": "6.mp4",
+      "timestamp": "2:09",
+      "duration": 50.6,
+      "importance": 7,
+      "category": "explanation",
+      "summary": "アメリカの再生産業について",
+      "speaker": "話者A",
+      "text": "完全な日本語テキスト..."
+    }
+  ]
+}
+```
+
+### 処理コスト
+
+- **API呼び出し**: 1回のみ（全セグメントを一括評価）
+- **トークン数**: セグメント数 × 平均文字数 × 2
+- **コスト見積もり**:
+  - 30分動画（8セグメント）: 約$0.05
+  - 74分動画（141セグメント）: 約$0.19
+  - 長い動画（300セグメント）: 約$0.50
+
+評価はキャッシュされるため、再実行時はスキップされます。
 
 ## カスタマイズ
 
@@ -382,14 +510,23 @@ OpenAI APIの料金（2024年11月時点）：
 - **Whisper API**: $0.006 / 分
 - **TTS API**: $15.00 / 1M文字
 - **GPT-4o-mini API** (翻訳): $0.15 / 1M入力トークン、$0.60 / 1M出力トークン
-- **GPT-4o API** (話者識別): $2.50 / 1M入力トークン、$10.00 / 1M出力トークン
+- **GPT-4o API** (話者識別 + 🆕重要度評価): $2.50 / 1M入力トークン、$10.00 / 1M出力トークン
 
 例: 30分の動画（8セグメント、約2000文字の日本語テキスト）の場合
 - Whisper: 約 $0.18
 - TTS (日本語音声生成): 約 $0.03
 - GPT-4o-mini (翻訳): 約 $0.10〜$0.30
 - GPT-4o (話者識別): 約 $0.50〜$2.00
-- **合計**: 約 $0.80〜$2.50
+- 🆕 GPT-4o (重要度評価): 約 $0.05
+- **合計**: 約 $0.86〜$2.56
+
+例: 74分の動画（141セグメント）の場合
+- Whisper: 約 $0.44
+- TTS: 約 $0.30
+- GPT-4o-mini (翻訳): 約 $0.50〜$1.50
+- GPT-4o (話者識別): 約 $7.00〜$28.00
+- 🆕 GPT-4o (重要度評価): 約 $0.19
+- **合計**: 約 $8.43〜$30.43
 
 ## 技術スタック
 

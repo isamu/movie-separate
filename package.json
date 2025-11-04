@@ -7,6 +7,8 @@
     "lint": "eslint src",
     "start": "tsx src/index.ts",
     "start:test": "tsx src/index.ts --test",
+    "evaluate": "tsx src/evaluate-only.ts",
+    "digest": "tsx src/digest.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",

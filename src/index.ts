@@ -11,6 +11,7 @@ import {
 } from './ffmpeg-utils.js';
 import { segmentVideo } from './segmentation.js';
 import { transcribeAudioBilingual, identifySpeakers, textToSpeech } from './transcription.js';
+import { evaluateSegments } from './evaluation.js';
 import { Beat, Output } from './types.js';
 
 dotenv.config();
@@ -247,6 +248,52 @@ async function main() {
       console.log(`  🎤 Generating Japanese TTS audio...`);
       await textToSpeech(beat.multiLinguals.ja, jaAudioOutput, 'ja');
     }
+  }
+
+  // フェーズ3: セグメント重要度評価
+  console.log('\n\n📊 Phase 3: Segment Importance Evaluation');
+  console.log('=========================================');
+
+  // 全セグメントに評価データがあるかチェック
+  const needsEvaluation = beats.some(
+    beat => beat.importance === undefined || beat.category === undefined || beat.summary === undefined
+  );
+
+  if (needsEvaluation) {
+    console.log('🔍 Evaluating segment importance...');
+
+    try {
+      const evaluations = await evaluateSegments(beats);
+
+      // 評価結果を各Beatに追加
+      for (let i = 0; i < beats.length; i++) {
+        const segmentNum = i + 1;
+        const evaluation = evaluations.get(segmentNum);
+
+        if (evaluation) {
+          beats[i].importance = evaluation.importance;
+          beats[i].category = evaluation.category;
+          beats[i].summary = evaluation.summary;
+        }
+      }
+
+      console.log('✅ Evaluation complete!');
+
+      // 統計情報を表示
+      const highImportance = beats.filter(b => (b.importance || 0) >= 7).length;
+      const mediumImportance = beats.filter(b => (b.importance || 0) >= 4 && (b.importance || 0) < 7).length;
+      const lowImportance = beats.filter(b => (b.importance || 0) < 4).length;
+
+      console.log(`\n📈 Importance Distribution:`);
+      console.log(`   High (7-10): ${highImportance} segments`);
+      console.log(`   Medium (4-6): ${mediumImportance} segments`);
+      console.log(`   Low (0-3): ${lowImportance} segments`);
+    } catch (error) {
+      console.error('⚠️  Evaluation failed:', error);
+      console.log('   Continuing without evaluation data...');
+    }
+  } else {
+    console.log('♻️  All segments already evaluated, skipping evaluation');
   }
 
   // 最終結果をJSONとして保存

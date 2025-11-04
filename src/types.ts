@@ -18,6 +18,9 @@ export interface Beat {
   startTime?: number; // オプション
   endTime?: number; // オプション
   duration?: number; // オプション
+  importance?: number; // 重要度スコア (0-10)
+  category?: string; // カテゴリ
+  summary?: string; // 1-2文の要約
 }
 
 export interface Output {

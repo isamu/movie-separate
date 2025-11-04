@@ -5,7 +5,7 @@ import { Beat, MultiLinguals } from './types.js';
 // OpenAIクライアントを遅延初期化
 let openai: OpenAI;
 
-function getOpenAIClient(): OpenAI {
+export function getOpenAIClient(): OpenAI {
   if (!openai) {
     if (!process.env.OPENAI_API_KEY) {
       throw new Error(

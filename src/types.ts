@@ -24,6 +24,7 @@ export interface Beat {
 }
 
 export interface Output {
+  lang: string; // デフォルト言語 ("ja" | "en")
   totalDuration: number;
   totalSegments: number;
   beats: Beat[];

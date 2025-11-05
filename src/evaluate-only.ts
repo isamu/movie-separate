@@ -262,6 +262,11 @@ async function main() {
   const jsonContent = await fs.readFile(inputPath, 'utf-8');
   const data: Output = JSON.parse(jsonContent);
 
+  // langフィールドがない場合はデフォルト値を設定
+  if (!data.lang) {
+    data.lang = 'en';
+  }
+
   console.log(`📊 Found ${data.beats.length} segments`);
 
   // 評価を実行

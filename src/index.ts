@@ -25,20 +25,23 @@ const TEST_DURATION = 5 * 60; // 5分 = 300秒
 
 // 入力動画ファイルを引数から取得（デフォルトは ai.mp4）
 let INPUT_VIDEO = 'ai.mp4';
+let DEFAULT_LANG = 'en'; // デフォルト言語
+
 for (let i = 0; i < args.length; i++) {
   if ((args[i] === '--input' || args[i] === '-i') && args[i + 1]) {
     INPUT_VIDEO = args[i + 1];
-    break;
+  } else if ((args[i] === '--lang' || args[i] === '-l') && args[i + 1]) {
+    DEFAULT_LANG = args[i + 1];
   } else if (!args[i].startsWith('-') && args[i].endsWith('.mp4')) {
     // フラグなしで .mp4 ファイルが指定された場合
     INPUT_VIDEO = args[i];
-    break;
   }
 }
 
 async function main() {
   console.log('🎬 Starting video processing...');
   console.log(`📹 Input video: ${INPUT_VIDEO}`);
+  console.log(`🌐 Default language: ${DEFAULT_LANG}`);
 
   if (TEST_MODE) {
     console.log('🧪 TEST MODE: Processing first 5 minutes only');
@@ -221,6 +224,7 @@ async function main() {
 
     // 各セグメント処理後にJSONを保存（安全のため）
     const output: Output = {
+      lang: DEFAULT_LANG,
       totalDuration: processDuration,
       totalSegments: segments.length,
       beats: beats,
@@ -298,6 +302,7 @@ async function main() {
 
   // 最終結果をJSONとして保存
   const output: Output = {
+    lang: DEFAULT_LANG,
     totalDuration: processDuration,
     totalSegments: segments.length,
     beats: beats,

@@ -91,6 +91,20 @@ npm start -- -i your-video.mp4
 npm start -- your-video.mp4
 ```
 
+### デフォルト言語の指定
+
+JSONに保存されるデフォルト言語を指定できます（デフォルト: `en`）：
+
+```bash
+# 日本語をデフォルトに
+npm start -- -i your-video.mp4 --lang ja
+
+# または短縮形
+npm start -- -i your-video.mp4 -l ja
+```
+
+これにより、出力JSONに`"lang": "ja"`が含まれます。
+
 ### テストモード（最初の5分だけ処理）
 
 長い動画をテストする場合、最初の5分だけを処理できます：
@@ -185,6 +199,7 @@ output/
 
 ```json
 {
+  "lang": "en",
   "totalDuration": 465.5,
   "totalSegments": 8,
   "beats": [
@@ -234,6 +249,7 @@ output/
 
 #### フィールドの説明
 
+- `lang`: デフォルト言語（"en" または "ja"）
 - `totalDuration`: 処理した動画の総時間（秒）
 - `totalSegments`: 分割されたセグメントの総数
 - `beats[]`: 各セグメントの情報

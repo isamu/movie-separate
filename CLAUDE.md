@@ -81,11 +81,36 @@ async function processData(path: string): Promise<void> {
 }
 ```
 
+### 並列処理
+- **API呼び出しは並列化を検討**
+  - `src/concurrency.ts`の`processWithConcurrency()`を使用
+  - 各APIの制限に応じた並列数を設定
+  - デフォルトはOpenAI Tier 1に基づく安全な値
+
+```typescript
+// ✅ 並列処理の例
+import { processWithConcurrency, getConcurrencyConfig } from './concurrency.js';
+
+const config = getConcurrencyConfig();
+
+// TTS音声を並列生成
+await processWithConcurrency(
+  beats,
+  async (beat, index) => {
+    const outputPath = path.join(dir, `${index + 1}_ja.mp3`);
+    await textToSpeech(beat.text, outputPath, 'ja');
+  },
+  config.tts // 並列数の制限
+);
+```
+
 ## プロジェクト構造
 
 ```
 src/
 ├── types.ts           # 型定義
+├── cli.ts             # CLI引数パース
+├── concurrency.ts     # 並列処理ユーティリティ
 ├── index.ts           # メインエントリーポイント
 ├── ffmpeg-utils.ts    # FFmpeg関連ユーティリティ
 ├── segmentation.ts    # 動画分割ロジック
@@ -96,7 +121,8 @@ src/
 └── speed.ts           # 速度変更ツール
 
 test/
-├── digest_test.ts     # digestのテスト
+├── concurrency_test.ts  # 並列処理のテスト
+├── digest_test.ts       # digestのテスト
 ├── ffmpeg-utils_test.ts
 └── transcription_test.ts
 ```

@@ -274,16 +274,15 @@ async function main() {
   const evaluations = await evaluateSegments(data.beats);
 
   // 評価結果を各Beatに追加
-  for (let i = 0; i < data.beats.length; i++) {
-    const segmentNum = i + 1;
+  data.beats.forEach((beat, index) => {
+    const segmentNum = index + 1;
     const evaluation = evaluations.get(segmentNum);
-
     if (evaluation) {
-      data.beats[i].importance = evaluation.importance;
-      data.beats[i].category = evaluation.category;
-      data.beats[i].summary = evaluation.summary;
+      beat.importance = evaluation.importance;
+      beat.category = evaluation.category;
+      beat.summary = evaluation.summary;
     }
-  }
+  });
 
   // 統計情報を表示
   const highImportance = data.beats.filter(b => (b.importance || 0) >= 8).length;
@@ -300,19 +299,19 @@ async function main() {
 
   // スコアの詳細分布
   const scoreCounts = new Map<number, number>();
-  for (const beat of data.beats) {
+  data.beats.forEach((beat) => {
     const score = beat.importance || 0;
     scoreCounts.set(score, (scoreCounts.get(score) || 0) + 1);
-  }
+  });
 
   console.log(`\n📊 Score Distribution:`);
-  for (let score = 10; score >= 0; score--) {
+  Array.from({ length: 11 }, (_, i) => 10 - i).forEach((score) => {
     const count = scoreCounts.get(score) || 0;
     if (count > 0) {
       const bar = '█'.repeat(Math.ceil(count / data.beats.length * 50));
       console.log(`   ${score.toString().padStart(2)}: ${bar} ${count}`);
     }
-  }
+  });
 
   // 保存
   await fs.writeFile(inputPath, JSON.stringify(data, null, 2), 'utf-8');

@@ -29,16 +29,19 @@ export interface TranscriptionWithTimestamps {
 }
 
 /**
- * Whisper APIで音声を文字起こし（タイムスタンプ付き）
+ * Whisper APIで音声を文字起こし
+ * @param audioPath 音声ファイルのパス
+ * @param language 音声の言語 ('en' | 'ja')
  */
 export async function transcribeAudio(
-  audioPath: string
+  audioPath: string,
+  language: string = 'en'
 ): Promise<string> {
   const client = getOpenAIClient();
   const transcription = await client.audio.transcriptions.create({
     file: createReadStream(audioPath),
     model: 'whisper-1',
-    language: 'ja',
+    language: language,
   });
 
   return transcription.text;
@@ -137,56 +140,71 @@ export async function identifyMainSpeaker(
 }
 
 /**
- * 日本語テキストを英語に翻訳
+ * テキストを翻訳
+ * @param text 翻訳元テキスト
+ * @param fromLang 翻訳元言語
+ * @param toLang 翻訳先言語
  */
-export async function translateToEnglish(japaneseText: string): Promise<string> {
+export async function translateText(
+  text: string,
+  fromLang: string,
+  toLang: string
+): Promise<string> {
   try {
     const client = getOpenAIClient();
+    const langNames = { en: 'English', ja: 'Japanese' };
     const completion = await client.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         {
           role: 'system',
-          content: 'You are a professional translator. Translate the given Japanese text to natural English. Only return the translated text, nothing else.',
+          content: `You are a professional translator. Translate the given ${langNames[fromLang as keyof typeof langNames]} text to natural ${langNames[toLang as keyof typeof langNames]}. Only return the translated text, nothing else.`,
         },
         {
           role: 'user',
-          content: japaneseText,
+          content: text,
         },
       ],
     });
 
-    return completion.choices[0].message.content || japaneseText;
+    return completion.choices[0].message.content || text;
   } catch (error) {
-    console.warn('Failed to translate to English:', error);
-    return japaneseText; // フォールバック: 翻訳失敗時は元のテキストを返す
+    console.warn(`Failed to translate from ${fromLang} to ${toLang}:`, error);
+    return text;
   }
 }
 
 /**
  * 音声を文字起こしして日英両方のテキストを返す
- * 翻訳キャッシュがある場合は再翻訳をスキップ
+ * @param audioPath 音声ファイルのパス
+ * @param sourceLang 音声の元言語 ('en' | 'ja')
+ * @param translationCache 翻訳キャッシュ（元言語 -> 翻訳先言語）
  */
 export async function transcribeAudioBilingual(
   audioPath: string,
+  sourceLang: string = 'en',
   translationCache?: Map<string, string>
 ): Promise<MultiLinguals> {
-  const japaneseText = await transcribeAudio(audioPath);
+  const sourceText = await transcribeAudio(audioPath, sourceLang);
+  const targetLang = sourceLang === 'en' ? 'ja' : 'en';
 
-  // キャッシュをチェック
-  let englishText: string;
-  if (translationCache && translationCache.has(japaneseText)) {
-    englishText = translationCache.get(japaneseText)!;
+  const getCachedTranslation = () => {
     console.log(`    ♻️  Using cached translation`);
-  } else {
-    console.log(`    🌐 Translating to English...`);
-    englishText = await translateToEnglish(japaneseText);
-  }
-
-  return {
-    ja: japaneseText,
-    en: englishText,
+    return translationCache!.get(sourceText)!;
   };
+
+  const getNewTranslation = async () => {
+    console.log(`    🌐 Translating from ${sourceLang} to ${targetLang}...`);
+    return await translateText(sourceText, sourceLang, targetLang);
+  };
+
+  const translatedText = translationCache?.has(sourceText)
+    ? getCachedTranslation()
+    : await getNewTranslation();
+
+  return sourceLang === 'en'
+    ? { en: sourceText, ja: translatedText }
+    : { ja: sourceText, en: translatedText };
 }
 
 /**

@@ -12,30 +12,210 @@ import {
 import { segmentVideo } from './segmentation.js';
 import { transcribeAudioBilingual, identifySpeakers, textToSpeech } from './transcription.js';
 import { evaluateSegments } from './evaluation.js';
-import { Beat, Output } from './types.js';
+import { Beat, Output, MultiLinguals } from './types.js';
+import { parseArgs } from './cli.js';
 
 dotenv.config();
 
 const OUTPUT_DIR = 'output';
 
 // コマンドライン引数をパース
-const args = process.argv.slice(2);
-const TEST_MODE = args.includes('--test') || args.includes('-t');
-const TEST_DURATION = 5 * 60; // 5分 = 300秒
+const cliOptions = parseArgs(process.argv.slice(2));
+const INPUT_VIDEO = cliOptions.inputVideo;
+const DEFAULT_LANG = cliOptions.defaultLang;
+const TEST_MODE = cliOptions.testMode;
+const TEST_DURATION = cliOptions.testDuration;
 
-// 入力動画ファイルを引数から取得（デフォルトは ai.mp4）
-let INPUT_VIDEO = 'ai.mp4';
-let DEFAULT_LANG = 'en'; // デフォルト言語
+function populateCacheMaps(
+  beats: Beat[],
+  translationMap: Map<string, string>,
+  beatMap: Map<string, Beat>
+) {
+  beats.forEach((beat) => {
+    if (beat.multiLinguals?.ja && beat.multiLinguals?.en) {
+      translationMap.set(beat.multiLinguals.ja, beat.multiLinguals.en);
+    }
+    if (beat.videoSource) {
+      beatMap.set(beat.videoSource, beat);
+    }
+  });
+}
 
-for (let i = 0; i < args.length; i++) {
-  if ((args[i] === '--input' || args[i] === '-i') && args[i + 1]) {
-    INPUT_VIDEO = args[i + 1];
-  } else if ((args[i] === '--lang' || args[i] === '-l') && args[i + 1]) {
-    DEFAULT_LANG = args[i + 1];
-  } else if (!args[i].startsWith('-') && args[i].endsWith('.mp4')) {
-    // フラグなしで .mp4 ファイルが指定された場合
-    INPUT_VIDEO = args[i];
+async function loadExistingCache(outputPath: string) {
+  const existingTranslations = new Map<string, string>();
+  const existingBeatsCache = new Map<string, Beat>();
+
+  try {
+    const existingData = await fs.readFile(outputPath, 'utf-8');
+    const existingOutput: Output = JSON.parse(existingData);
+    populateCacheMaps(existingOutput.beats, existingTranslations, existingBeatsCache);
+
+    if (existingBeatsCache.size > 0) {
+      console.log(`♻️  Loaded ${existingBeatsCache.size} existing segments from cache`);
+      console.log(`   - ${existingTranslations.size} translations`);
+    }
+  } catch {
+    console.log('📝 No existing cache found, starting fresh');
   }
+
+  return { existingTranslations, existingBeatsCache };
+}
+
+async function generateVideoAndThumbnail(
+  videoOutput: string,
+  thumbnailOutput: string,
+  inputVideo: string,
+  start: number,
+  duration: number
+) {
+  try {
+    await fs.access(videoOutput);
+    await fs.access(thumbnailOutput);
+    console.log(`  ♻️  Video and thumbnail already exist, skipping generation`);
+    return false;
+  } catch {
+    console.log(`  📹 Splitting video...`);
+    await splitVideo(inputVideo, videoOutput, start, duration);
+    console.log(`  🖼️  Generating thumbnail...`);
+    await generateThumbnail(videoOutput, thumbnailOutput, 0);
+    return true;
+  }
+}
+
+async function extractAudioIfNeeded(
+  audioOutput: string,
+  inputVideo: string,
+  start: number,
+  duration: number
+) {
+  try {
+    await fs.access(audioOutput);
+    console.log(`  ♻️  Audio file already exists, skipping extraction`);
+    return false;
+  } catch {
+    console.log(`  🎵 Extracting audio...`);
+    await splitAudio(inputVideo, audioOutput, start, duration);
+    return true;
+  }
+}
+
+async function getTranscriptionAndTranslation(
+  cachedBeat: Beat | undefined,
+  audioOutput: string,
+  existingTranslations: Map<string, string>,
+  sourceLang: string
+): Promise<MultiLinguals> {
+  if (cachedBeat?.multiLinguals?.ja && cachedBeat?.multiLinguals?.en) {
+    console.log(`  ♻️  Transcription and translation cached, skipping Whisper & Translation API`);
+    return cachedBeat.multiLinguals;
+  }
+
+  console.log(`  📝 Transcribing audio (${sourceLang})...`);
+  const multiLinguals = await transcribeAudioBilingual(audioOutput, sourceLang, existingTranslations);
+  const targetLang = sourceLang === 'en' ? 'ja' : 'en';
+  console.log(`  ✅ Transcription (${sourceLang.toUpperCase()}): ${multiLinguals[sourceLang as 'en' | 'ja'].substring(0, 80)}...`);
+  console.log(`  ✅ Translation (${targetLang.toUpperCase()}): ${multiLinguals[targetLang as 'en' | 'ja'].substring(0, 80)}...`);
+  return multiLinguals;
+}
+
+async function identifySpeaker(
+  cachedBeat: Beat | undefined,
+  multiLinguals: MultiLinguals
+): Promise<string> {
+  if (cachedBeat?.speaker) {
+    console.log(`  ♻️  Speaker identification cached, skipping GPT-4o API`);
+    return cachedBeat.speaker;
+  }
+
+  console.log(`  👥 Identifying speakers...`);
+  const speakerSegments = await identifySpeakers(multiLinguals.ja);
+  return speakerSegments.length > 0 ? speakerSegments[0].speaker : 'Unknown Speaker';
+}
+
+async function generateJapaneseTTS(jaAudioOutput: string, text: string) {
+  try {
+    await fs.access(jaAudioOutput);
+    console.log(`  ♻️  Japanese TTS audio already exists, skipping TTS API`);
+    return false;
+  } catch {
+    console.log(`  🎤 Generating Japanese TTS audio...`);
+    await textToSpeech(text, jaAudioOutput, 'ja');
+    return true;
+  }
+}
+
+function displayEvaluationStats(beats: Beat[]) {
+  const highImportance = beats.filter(b => (b.importance || 0) >= 7).length;
+  const mediumImportance = beats.filter(b => (b.importance || 0) >= 4 && (b.importance || 0) < 7).length;
+  const lowImportance = beats.filter(b => (b.importance || 0) < 4).length;
+
+  console.log(`\n📈 Importance Distribution:`);
+  console.log(`   High (7-10): ${highImportance} segments`);
+  console.log(`   Medium (4-6): ${mediumImportance} segments`);
+  console.log(`   Low (0-3): ${lowImportance} segments`);
+}
+
+function createBeatFromSegment(
+  segmentNum: number,
+  segment: { start: number; end: number },
+  multiLinguals: MultiLinguals,
+  mainSpeaker: string
+): Beat {
+  const duration = segment.end - segment.start;
+  return {
+    text: multiLinguals.en,
+    audioSources: { en: `${segmentNum}.mp3`, ja: `${segmentNum}_ja.mp3` },
+    multiLinguals: multiLinguals,
+    videoSource: `${segmentNum}.mp4`,
+    thumbnail: `${segmentNum}.jpg`,
+    speaker: mainSpeaker,
+    startTime: segment.start,
+    endTime: segment.end,
+    duration: duration,
+  };
+}
+
+interface SegmentProcessingContext {
+  segment: { start: number; end: number };
+  segmentNum: number;
+  totalSegments: number;
+  videoOutputDir: string;
+  existingBeatsCache: Map<string, Beat>;
+  existingTranslations: Map<string, string>;
+  sourceLang: string;
+}
+
+async function processSegmentPhase1(ctx: SegmentProcessingContext): Promise<Beat> {
+  const { segment, segmentNum, totalSegments, videoOutputDir, existingBeatsCache, existingTranslations, sourceLang } = ctx;
+  const duration = segment.end - segment.start;
+  console.log(`\n🎞️  Processing segment ${segmentNum}/${totalSegments} (${segment.start.toFixed(1)}s - ${segment.end.toFixed(1)}s, duration: ${duration.toFixed(1)}s)...`);
+
+  const videoOutput = path.join(videoOutputDir, `${segmentNum}.mp4`);
+  const audioOutput = path.join(videoOutputDir, `${segmentNum}.mp3`);
+  const thumbnailOutput = path.join(videoOutputDir, `${segmentNum}.jpg`);
+  const cachedBeat = existingBeatsCache.get(`${segmentNum}.mp4`);
+
+  await generateVideoAndThumbnail(videoOutput, thumbnailOutput, INPUT_VIDEO, segment.start, duration);
+  await extractAudioIfNeeded(audioOutput, INPUT_VIDEO, segment.start, duration);
+  const multiLinguals = await getTranscriptionAndTranslation(cachedBeat, audioOutput, existingTranslations, sourceLang);
+  const mainSpeaker = await identifySpeaker(cachedBeat, multiLinguals);
+  return createBeatFromSegment(segmentNum, segment, multiLinguals, mainSpeaker);
+}
+
+async function saveProgress(
+  outputPath: string,
+  beats: Beat[],
+  processDuration: number,
+  totalSegments: number
+) {
+  const output: Output = {
+    lang: DEFAULT_LANG,
+    totalDuration: processDuration,
+    totalSegments: totalSegments,
+    beats: beats,
+  };
+  await fs.writeFile(outputPath, JSON.stringify(output, null, 2), 'utf-8');
+  console.log(`  💾 Saved progress to ${path.basename(outputPath)}`);
 }
 
 async function main() {
@@ -57,32 +237,7 @@ async function main() {
 
   // 既存のデータをロード（存在する場合）
   const outputPath = path.join(videoOutputDir, 'mulmo_view.json');
-  const existingTranslations = new Map<string, string>(); // 日本語 -> 英語のマッピング
-  const existingBeatsCache = new Map<string, Beat>(); // ファイル名 -> Beat のマッピング
-
-  try {
-    const existingData = await fs.readFile(outputPath, 'utf-8');
-    const existingOutput: Output = JSON.parse(existingData);
-
-    for (const beat of existingOutput.beats) {
-      // 翻訳キャッシュ
-      if (beat.multiLinguals?.ja && beat.multiLinguals?.en) {
-        existingTranslations.set(beat.multiLinguals.ja, beat.multiLinguals.en);
-      }
-      // Beat全体のキャッシュ（ファイル名をキーに）
-      if (beat.videoSource) {
-        existingBeatsCache.set(beat.videoSource, beat);
-      }
-    }
-
-    if (existingBeatsCache.size > 0) {
-      console.log(`♻️  Loaded ${existingBeatsCache.size} existing segments from cache`);
-      console.log(`   - ${existingTranslations.size} translations`);
-    }
-  } catch (error) {
-    // ファイルが存在しない場合は無視
-    console.log('📝 No existing cache found, starting fresh');
-  }
+  const { existingTranslations, existingBeatsCache } = await loadExistingCache(outputPath);
 
   // 動画の全体の長さを取得
   const totalDuration = await getVideoDuration(INPUT_VIDEO);
@@ -123,135 +278,30 @@ async function main() {
   console.log('\n📋 Phase 1: Transcription and Translation');
   console.log('=========================================');
 
-  for (let i = 0; i < segments.length; i++) {
-    const segmentNum = i + 1;
-    const segment = segments[i];
-    const duration = segment.end - segment.start;
-
-    console.log(
-      `\n🎞️  Processing segment ${segmentNum}/${segments.length} (${segment.start.toFixed(1)}s - ${segment.end.toFixed(1)}s, duration: ${duration.toFixed(1)}s)...`
-    );
-
-    const videoOutput = path.join(videoOutputDir, `${segmentNum}.mp4`);
-    const audioOutput = path.join(videoOutputDir, `${segmentNum}.mp3`);
-    const thumbnailOutput = path.join(videoOutputDir, `${segmentNum}.jpg`);
-    const videoFileName = `${segmentNum}.mp4`;
-
-    // キャッシュされたデータを取得
-    const cachedBeat = existingBeatsCache.get(videoFileName);
-
-    // 動画ファイルとサムネイルが存在しない場合のみ生成
-    let shouldGenerateVideo = true;
-    try {
-      await fs.access(videoOutput);
-      await fs.access(thumbnailOutput);
-      console.log(`  ♻️  Video and thumbnail already exist, skipping generation`);
-      shouldGenerateVideo = false;
-    } catch {
-      // ファイルが存在しない場合は生成
-    }
-
-    if (shouldGenerateVideo) {
-      // 動画を分割
-      console.log(`  📹 Splitting video...`);
-      await splitVideo(INPUT_VIDEO, videoOutput, segment.start, duration);
-
-      // サムネイル画像を生成
-      console.log(`  🖼️  Generating thumbnail...`);
-      await generateThumbnail(videoOutput, thumbnailOutput, 0);
-    }
-
-    // 音声ファイルが存在しない場合のみ抽出（Whisper APIの課金対象）
-    let shouldExtractAudio = true;
-    try {
-      await fs.access(audioOutput);
-      console.log(`  ♻️  Audio file already exists, skipping extraction`);
-      shouldExtractAudio = false;
-    } catch {
-      // ファイルが存在しない場合は抽出
-    }
-
-    if (shouldExtractAudio) {
-      console.log(`  🎵 Extracting audio...`);
-      await splitAudio(INPUT_VIDEO, audioOutput, segment.start, duration);
-    }
-
-    // 文字起こしと翻訳（Whisper API + Translation APIの課金対象）
-    let multiLinguals: MultiLinguals;
-    if (cachedBeat && cachedBeat.multiLinguals?.ja && cachedBeat.multiLinguals?.en) {
-      // キャッシュされたテキストデータがある場合はスキップ
-      console.log(`  ♻️  Transcription and translation cached, skipping Whisper & Translation API`);
-      multiLinguals = cachedBeat.multiLinguals;
-    } else {
-      // 音声を文字起こし（日英両方、キャッシュを使用）
-      console.log(`  📝 Transcribing audio...`);
-      multiLinguals = await transcribeAudioBilingual(audioOutput, existingTranslations);
-      console.log(`  ✅ Transcription (JA): ${multiLinguals.ja.substring(0, 80)}...`);
-      console.log(`  ✅ Translation (EN): ${multiLinguals.en.substring(0, 80)}...`);
-    }
-
-    // 話者識別（GPT-4o APIの課金対象）
-    let mainSpeaker: string;
-    if (cachedBeat && cachedBeat.speaker) {
-      // キャッシュされた話者情報がある場合はスキップ
-      console.log(`  ♻️  Speaker identification cached, skipping GPT-4o API`);
-      mainSpeaker = cachedBeat.speaker;
-    } else {
-      // 話者識別を試みる（各セグメントに対して）
-      console.log(`  👥 Identifying speakers...`);
-      const speakerSegments = await identifySpeakers(multiLinguals.ja);
-      // 話者が複数いる場合は最初の話者を使用（簡略化）
-      mainSpeaker =
-        speakerSegments.length > 0
-          ? speakerSegments[0].speaker
-          : 'Unknown Speaker';
-    }
-
-    beats.push({
-      text: multiLinguals.en, // textは英語
-      audioSources: {
-        en: `${segmentNum}.mp3`,
-        ja: `${segmentNum}_ja.mp3`,
-      },
-      multiLinguals: multiLinguals,
-      videoSource: `${segmentNum}.mp4`,
-      thumbnail: `${segmentNum}.jpg`,
-      speaker: mainSpeaker,
-      startTime: segment.start,
-      endTime: segment.end,
-      duration: duration,
-    });
-
-    // 各セグメント処理後にJSONを保存（安全のため）
-    const output: Output = {
-      lang: DEFAULT_LANG,
-      totalDuration: processDuration,
+  for (const [index, segment] of segments.entries()) {
+    const segmentNum = index + 1;
+    const beat = await processSegmentPhase1({
+      segment,
+      segmentNum,
       totalSegments: segments.length,
-      beats: beats,
-    };
-    await fs.writeFile(outputPath, JSON.stringify(output, null, 2), 'utf-8');
-    console.log(`  💾 Saved progress to ${path.basename(outputPath)}`);
+      videoOutputDir,
+      existingBeatsCache,
+      existingTranslations,
+      sourceLang: DEFAULT_LANG,
+    });
+    beats.push(beat);
+    await saveProgress(outputPath, beats, processDuration, segments.length);
   }
 
   // フェーズ2: TTS音声生成
   console.log('\n\n🎤 Phase 2: Japanese TTS Audio Generation');
   console.log('=========================================');
 
-  for (let i = 0; i < beats.length; i++) {
-    const segmentNum = i + 1;
-    const beat = beats[i];
+  for (const [index, beat] of beats.entries()) {
+    const segmentNum = index + 1;
     const jaAudioOutput = path.join(videoOutputDir, `${segmentNum}_ja.mp3`);
-
     console.log(`\n🔊 Processing TTS for segment ${segmentNum}/${beats.length}...`);
-
-    // TTS音声ファイルが存在しない場合のみ生成（TTS APIの課金対象）
-    try {
-      await fs.access(jaAudioOutput);
-      console.log(`  ♻️  Japanese TTS audio already exists, skipping TTS API`);
-    } catch {
-      console.log(`  🎤 Generating Japanese TTS audio...`);
-      await textToSpeech(beat.multiLinguals.ja, jaAudioOutput, 'ja');
-    }
+    await generateJapaneseTTS(jaAudioOutput, beat.multiLinguals.ja);
   }
 
   // フェーズ3: セグメント重要度評価
@@ -270,28 +320,18 @@ async function main() {
       const evaluations = await evaluateSegments(beats);
 
       // 評価結果を各Beatに追加
-      for (let i = 0; i < beats.length; i++) {
-        const segmentNum = i + 1;
+      beats.forEach((beat, index) => {
+        const segmentNum = index + 1;
         const evaluation = evaluations.get(segmentNum);
-
         if (evaluation) {
-          beats[i].importance = evaluation.importance;
-          beats[i].category = evaluation.category;
-          beats[i].summary = evaluation.summary;
+          beat.importance = evaluation.importance;
+          beat.category = evaluation.category;
+          beat.summary = evaluation.summary;
         }
-      }
+      });
 
       console.log('✅ Evaluation complete!');
-
-      // 統計情報を表示
-      const highImportance = beats.filter(b => (b.importance || 0) >= 7).length;
-      const mediumImportance = beats.filter(b => (b.importance || 0) >= 4 && (b.importance || 0) < 7).length;
-      const lowImportance = beats.filter(b => (b.importance || 0) < 4).length;
-
-      console.log(`\n📈 Importance Distribution:`);
-      console.log(`   High (7-10): ${highImportance} segments`);
-      console.log(`   Medium (4-6): ${mediumImportance} segments`);
-      console.log(`   Low (0-3): ${lowImportance} segments`);
+      displayEvaluationStats(beats);
     } catch (error) {
       console.error('⚠️  Evaluation failed:', error);
       console.log('   Continuing without evaluation data...');

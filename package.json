@@ -9,7 +9,8 @@
     "start:test": "tsx src/index.ts --test",
     "evaluate": "tsx src/evaluate-only.ts",
     "digest": "tsx src/digest.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "tsx --test 'test/**/*_test.ts'",
+    "test:watch": "tsx --test --watch 'test/**/*_test.ts'"
   },
   "author": "",
   "license": "MIT",

@@ -9,6 +9,8 @@
 - **Evaluate**: `npm run evaluate <mulmo_view.json>`
 - **Digest**: `npm run digest <mulmo_view.json> [min-importance]`
 - **Speed Change**: `npm run speed -- -i <file> -s <speed>`
+- **Test**: `npm test`
+- **Test Watch**: `npm run test:watch`
 - **Lint**: `npm run lint`
 
 ## コーディング規約
@@ -92,6 +94,11 @@ src/
 ├── evaluate-only.ts   # 評価専用スクリプト
 ├── digest.ts          # ダイジェスト生成
 └── speed.ts           # 速度変更ツール
+
+test/
+├── digest_test.ts     # digestのテスト
+├── ffmpeg-utils_test.ts
+└── transcription_test.ts
 ```
 
 ## TypeScript規約
@@ -201,6 +208,182 @@ docs: update README with lang parameter usage
 
 ## テスト
 
+### テストフレームワーク
+- **Node.js標準の`node:test`と`node:assert`を使用**
+- 外部テストライブラリ（Jest、Mochaなど）は使用しない
+- TypeScriptは`tsx`で直接実行
+
+### テストファイル構成
+```
+src/
+├── ffmpeg-utils.ts
+├── transcription.ts
+└── ...
+
+test/
+├── ffmpeg-utils_test.ts
+├── transcription_test.ts
+└── digest_test.ts
+```
+
+- テストファイルは`test/`ディレクトリに配置
+- ファイル名は`*_test.ts`形式
+
+### テストの原則
+
+#### 1. API Keyを使わないテスト
+- **外部API（OpenAI、LLMなど）は必ずモック化**
+- ローカル環境でAPI Keyなしで全テストが実行可能
+- CI/CDでも実行可能な状態を維持
+
+```typescript
+// ✅ 推奨：モックを使用
+import { test } from 'node:test';
+import assert from 'node:assert';
+
+test('transcribeAudio should return mocked result', async () => {
+  // OpenAIクライアントをモック
+  const mockClient = {
+    audio: {
+      transcriptions: {
+        create: async () => ({ text: 'モックされた文字起こし' })
+      }
+    }
+  };
+
+  const result = await transcribeAudioWithClient(mockClient, 'test.mp3');
+  assert.strictEqual(result, 'モックされた文字起こし');
+});
+```
+
+#### 2. ファイルI/Oのモック
+- 実際のファイルシステムに依存しない
+- メモリ上でのテストを優先
+
+```typescript
+// ✅ 推奨：メモリ上のデータを使用
+import { test } from 'node:test';
+import assert from 'node:assert';
+
+test('parseJSON should parse valid JSON', () => {
+  const mockData = '{"key": "value"}';
+  const result = parseJSON(mockData);
+  assert.deepStrictEqual(result, { key: 'value' });
+});
+```
+
+#### 3. FFmpegのモック
+- FFmpeg呼び出しは実際に実行しない
+- コマンド生成ロジックのみをテスト
+
+```typescript
+// ✅ 推奨：コマンド生成をテスト
+test('buildFFmpegCommand should generate correct command', () => {
+  const cmd = buildFFmpegCommand({
+    input: 'test.mp4',
+    output: 'output.mp4',
+    speed: 1.5
+  });
+
+  assert.ok(cmd.includes('setpts=PTS/1.5'));
+  assert.ok(cmd.includes('atempo=1.5'));
+});
+```
+
+### テストの実行
+
+```bash
+# すべてのテストを実行
+npm test
+
+# 特定のファイルのみ
+npm test -- test/ffmpeg-utils_test.ts
+
+# ウォッチモード
+npm run test:watch
+```
+
+### package.jsonのtest設定
+
+```json
+{
+  "scripts": {
+    "test": "tsx --test 'test/**/*_test.ts'",
+    "test:watch": "tsx --test --watch 'test/**/*_test.ts'"
+  }
+}
+```
+
+### テストケースの例
+
+```typescript
+import { test, describe } from 'node:test';
+import assert from 'node:assert';
+
+describe('formatTime', () => {
+  test('should format seconds to mm:ss', () => {
+    assert.strictEqual(formatTime(65), '1:05');
+    assert.strictEqual(formatTime(3661), '61:01');
+  });
+
+  test('should handle zero', () => {
+    assert.strictEqual(formatTime(0), '0:00');
+  });
+});
+
+describe('evaluateSegments with mock', () => {
+  test('should return evaluations without API call', async () => {
+    const mockBeats = [
+      { multiLinguals: { ja: 'テスト' }, speaker: 'A' }
+    ];
+
+    // OpenAIクライアントをモック
+    const mockEvaluations = new Map();
+    mockEvaluations.set(1, {
+      segmentNumber: 1,
+      importance: 7,
+      category: 'key_point',
+      summary: 'テスト要約'
+    });
+
+    const result = await evaluateSegmentsWithMock(mockBeats, mockEvaluations);
+    assert.strictEqual(result.size, 1);
+    assert.strictEqual(result.get(1).importance, 7);
+  });
+});
+```
+
+### モック実装のパターン
+
+#### 依存性注入（推奨）
+```typescript
+// ❌ 避ける：ハードコードされた依存
+async function transcribe(path: string) {
+  const client = getOpenAIClient(); // グローバル依存
+  return await client.audio.transcriptions.create(...);
+}
+
+// ✅ 推奨：依存性注入
+async function transcribe(
+  path: string,
+  client: OpenAIClient = getOpenAIClient()
+) {
+  return await client.audio.transcriptions.create(...);
+}
+
+// テストで簡単にモック可能
+test('transcribe with mock', async () => {
+  const mockClient = createMockClient();
+  const result = await transcribe('test.mp3', mockClient);
+  assert.ok(result);
+});
+```
+
+### テストカバレッジの目標
+- ユーティリティ関数: 100%
+- ビジネスロジック: 80%以上
+- 統合部分: モックで主要パスをカバー
+
 ### 手動テスト
 - 新機能追加時は必ずテストモードで確認
 - `npm run start:test`でクイックテスト
@@ -209,6 +392,8 @@ docs: update README with lang parameter usage
 - 空のファイル
 - 非常に短い/長い動画
 - 特殊文字を含むファイル名
+- 無効なJSON
+- ネットワークエラー（モックで再現）
 
 ## 依存関係
 
@@ -241,6 +426,8 @@ docs: update README with lang parameter usage
 - [ ] 適切なエラーハンドリング
 - [ ] JSDocコメントを記述
 - [ ] TypeScriptの型を明示
+- [ ] **テストを作成（node:test + node:assert）**
+- [ ] **外部API依存はモック化（API Keyなしでテスト可能）**
 - [ ] README更新（必要な場合）
 
 ## リファクタリング優先事項

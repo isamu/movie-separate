@@ -14,11 +14,12 @@ import { transcribeAudioBilingual, identifySpeakers, textToSpeech } from './tran
 import { evaluateSegments } from './evaluation.js';
 import { Beat, Output, MultiLinguals } from './types.js';
 import { parseArgs } from './cli.js';
-import { processWithConcurrency, getConcurrencyConfig } from './concurrency.js';
+import { getConcurrencyConfig, createApiLimiters } from './concurrency.js';
 
 dotenv.config();
 
 const CONCURRENCY = getConcurrencyConfig();
+const API_LIMITERS = createApiLimiters(CONCURRENCY);
 
 const OUTPUT_DIR = 'output';
 
@@ -283,68 +284,37 @@ async function main() {
   console.log(`   Whisper Concurrency: ${CONCURRENCY.whisper} parallel requests`);
   console.log(`   Translation Concurrency: ${CONCURRENCY.translation} parallel requests`);
   console.log(`   Speaker ID Concurrency: ${CONCURRENCY.speakerId} parallel requests`);
+  console.log(`   Processing all segments in parallel with individual API limits`);
 
-  // ステップ1: 動画・音声処理（並列化）
-  console.log('\n📹 Step 1/3: Video and Audio Extraction');
-  await processWithConcurrency(
-    segments,
-    async (segment, index) => {
-      const segmentNum = index + 1;
-      const duration = segment.end - segment.start;
-      const videoOutput = path.join(videoOutputDir, `${segmentNum}.mp4`);
-      const audioOutput = path.join(videoOutputDir, `${segmentNum}.mp3`);
-      const thumbnailOutput = path.join(videoOutputDir, `${segmentNum}.jpg`);
-
-      await generateVideoAndThumbnail(videoOutput, thumbnailOutput, INPUT_VIDEO, segment.start, duration);
-      await extractAudioIfNeeded(audioOutput, INPUT_VIDEO, segment.start, duration);
-    },
-    5 // 動画処理は並列度を抑える
-  );
-
-  // ステップ2: 書き起こしと翻訳（並列化）
-  console.log('\n📝 Step 2/3: Transcription and Translation');
-  const transcriptions = await processWithConcurrency(
-    segments,
-    async (segment, index) => {
-      const segmentNum = index + 1;
-      const audioOutput = path.join(videoOutputDir, `${segmentNum}.mp3`);
-      const videoFileName = `${segmentNum}.mp4`;
-      const cachedBeat = existingBeatsCache.get(videoFileName);
-
-      return await getTranscriptionAndTranslation(
-        cachedBeat,
-        audioOutput,
-        existingTranslations,
-        DEFAULT_LANG
-      );
-    },
-    CONCURRENCY.whisper
-  );
-
-  // ステップ3: 話者識別（並列化）
-  console.log('\n👥 Step 3/3: Speaker Identification');
-  const speakers = await processWithConcurrency(
-    transcriptions,
-    async (multiLinguals, index) => {
-      const segmentNum = index + 1;
-      const videoFileName = `${segmentNum}.mp4`;
-      const cachedBeat = existingBeatsCache.get(videoFileName);
-      return await identifySpeaker(cachedBeat, multiLinguals);
-    },
-    CONCURRENCY.speakerId
-  );
-
-  // Beatオブジェクトを作成
-  segments.forEach((segment, index) => {
+  // 全セグメントを並列処理（各API呼び出しはリミッターで制限）
+  const segmentPromises = segments.map(async (segment, index) => {
     const segmentNum = index + 1;
-    const beat = createBeatFromSegment(
-      segmentNum,
-      segment,
-      transcriptions[index],
-      speakers[index]
+    const duration = segment.end - segment.start;
+    const videoOutput = path.join(videoOutputDir, `${segmentNum}.mp4`);
+    const audioOutput = path.join(videoOutputDir, `${segmentNum}.mp3`);
+    const thumbnailOutput = path.join(videoOutputDir, `${segmentNum}.jpg`);
+    const videoFileName = `${segmentNum}.mp4`;
+    const cachedBeat = existingBeatsCache.get(videoFileName);
+
+    // 動画・音声処理（リミッターなし - ローカル処理）
+    await generateVideoAndThumbnail(videoOutput, thumbnailOutput, INPUT_VIDEO, segment.start, duration);
+    await extractAudioIfNeeded(audioOutput, INPUT_VIDEO, segment.start, duration);
+
+    // 書き起こしと翻訳（Whisperリミッター適用）
+    const multiLinguals = await API_LIMITERS.whisper(() =>
+      getTranscriptionAndTranslation(cachedBeat, audioOutput, existingTranslations, DEFAULT_LANG)
     );
-    beats.push(beat);
+
+    // 話者識別（SpeakerIDリミッター適用）
+    const speaker = await API_LIMITERS.speakerId(() =>
+      identifySpeaker(cachedBeat, multiLinguals)
+    );
+
+    return createBeatFromSegment(segmentNum, segment, multiLinguals, speaker);
   });
+
+  const processedBeats = await Promise.all(segmentPromises);
+  beats.push(...processedBeats);
 
   // 進捗を保存
   await saveProgress(outputPath, beats, processDuration, segments.length);
@@ -354,16 +324,16 @@ async function main() {
   console.log('=========================================');
   console.log(`   Concurrency: ${CONCURRENCY.tts} parallel requests`);
 
-  await processWithConcurrency(
-    beats,
-    async (beat, index) => {
-      const segmentNum = index + 1;
-      const jaAudioOutput = path.join(videoOutputDir, `${segmentNum}_ja.mp3`);
-      console.log(`\n🔊 Processing TTS for segment ${segmentNum}/${beats.length}...`);
-      await generateJapaneseTTS(jaAudioOutput, beat.multiLinguals.ja);
-    },
-    CONCURRENCY.tts
-  );
+  const ttsPromises = beats.map((beat, index) => {
+    const segmentNum = index + 1;
+    const jaAudioOutput = path.join(videoOutputDir, `${segmentNum}_ja.mp3`);
+    return API_LIMITERS.tts(() => {
+      console.log(`🔊 Processing TTS for segment ${segmentNum}/${beats.length}...`);
+      return generateJapaneseTTS(jaAudioOutput, beat.multiLinguals.ja);
+    });
+  });
+
+  await Promise.all(ttsPromises);
 
   // フェーズ3: セグメント重要度評価
   console.log('\n\n📊 Phase 3: Segment Importance Evaluation');

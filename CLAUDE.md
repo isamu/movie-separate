@@ -82,26 +82,26 @@ async function processData(path: string): Promise<void> {
 ```
 
 ### 並列処理
-- **API呼び出しは並列化を検討**
-  - `src/concurrency.ts`の`processWithConcurrency()`を使用
+- **p-limitを使用した常時並列実行**
+  - `src/concurrency.ts`で各API用のリミッターを作成
   - 各APIの制限に応じた並列数を設定
   - デフォルトはOpenAI Tier 1に基づく安全な値
+  - すべての処理を並列化し、個別のAPI呼び出しのみリミッターで制限
 
 ```typescript
-// ✅ 並列処理の例
-import { processWithConcurrency, getConcurrencyConfig } from './concurrency.js';
+// ✅ p-limitを使った並列処理の例
+import { createApiLimiters, getConcurrencyConfig } from './concurrency.js';
 
 const config = getConcurrencyConfig();
+const limiters = createApiLimiters(config);
 
-// TTS音声を並列生成
-await processWithConcurrency(
-  beats,
-  async (beat, index) => {
-    const outputPath = path.join(dir, `${index + 1}_ja.mp3`);
-    await textToSpeech(beat.text, outputPath, 'ja');
-  },
-  config.tts // 並列数の制限
-);
+// 全セグメントを並列処理（TTS呼び出しのみ制限）
+const ttsPromises = beats.map((beat, index) => {
+  const outputPath = path.join(dir, `${index + 1}_ja.mp3`);
+  return limiters.tts(() => textToSpeech(beat.text, outputPath, 'ja'));
+});
+
+await Promise.all(ttsPromises);
 ```
 
 ## プロジェクト構造

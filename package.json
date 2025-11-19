@@ -1,17 +1,17 @@
 {
   "name": "mulmo-movie",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "type": "module",
   "description": "AI-powered video processing tool with transcription, translation, and speaker identification",
-  "main": "dist/index.js",
+  "main": "lib/index.js",
   "bin": {
-    "mulmo-movie": "./bin/mulmo-movie.js"
+    "mulmo-movie": "./lib/bin.js"
   },
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "npm run build",
     "lint": "eslint src",
-    "start": "tsx bin/mulmo-movie.ts",
+    "start": "tsx src/bin.ts",
     "evaluate": "tsx src/evaluate-only.ts",
     "digest": "tsx src/digest.ts",
     "test": "tsx --test 'test/**/*_test.ts'",
@@ -28,21 +28,24 @@
     "speaker-identification",
     "cli"
   ],
-  "author": "",
+  "author": "Isamu Arimoto",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/mulmo-movie.git"
+    "url": "https://github.com/isamu/movie-separate.git"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "files": [
-    "dist",
-    "bin",
+    "lib",
     "README.md",
+    "package.json",
     "LICENSE"
   ],
+  "directories": {
+    "lib": "lib"
+  },
   "devDependencies": {
     "@types/node": "^24.10.1",
     "@types/p-limit": "^2.2.0",

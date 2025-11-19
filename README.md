@@ -1,4 +1,6 @@
-# AI Video Separator
+# mulmo-movie
+
+AI-powered video processing tool with transcription, translation, and speaker identification.
 
 対談動画を話の内容に応じて自動分割し、音声文字起こしと話者識別を行うツールです。
 
@@ -39,15 +41,23 @@ sudo apt install ffmpeg
 #### Windows
 [ffmpeg公式サイト](https://ffmpeg.org/download.html)からダウンロードしてインストール
 
-## セットアップ
+## インストール
 
-### 1. 依存関係のインストール
+### グローバルインストール（推奨）
 
 ```bash
-npm install
+npm install -g mulmo-movie
 ```
 
-### 2. OpenAI APIキーの設定
+### ローカルインストール
+
+```bash
+npm install mulmo-movie
+```
+
+## セットアップ
+
+### OpenAI APIキーの設定
 
 `.env`ファイルを作成して、APIキーを設定します：
 
@@ -80,72 +90,47 @@ SPEAKER_ID_CONCURRENCY=10  # 話者識別の並列数
 
 ### 基本的な使い方
 
-デフォルトの動画ファイル（ai.mp4）を処理：
-
 ```bash
-npm start
+mulmo-movie video.mp4
 ```
 
-### 動画ファイルを指定する
-
-#### 方法1: --input フラグを使用
+### オプション
 
 ```bash
-npm start -- --input your-video.mp4
+mulmo-movie <input> [options]
+
+Options:
+  -l, --lang     Source language (en or ja)  [default: "en"]
+  -t, --test     Test mode: first 5 minutes only
+  -o, --output   Output directory
+  -h, --help     Show help
+  -v, --version  Show version
 ```
 
-または短縮形：
+### 例
 
 ```bash
-npm start -- -i your-video.mp4
+# 英語動画を処理（デフォルト）
+mulmo-movie video.mp4
+
+# 日本語動画を処理
+mulmo-movie video.mp4 --lang ja
+
+# テストモード（最初の5分のみ）
+mulmo-movie --test video.mp4
+
+# 出力ディレクトリを指定
+mulmo-movie video.mp4 --output ./my-output
 ```
 
-#### 方法2: ファイル名を直接指定
+### その他のコマンド
 
-```bash
-npm start -- your-video.mp4
-```
-
-### デフォルト言語の指定
-
-JSONに保存されるデフォルト言語を指定できます（デフォルト: `en`）：
-
-```bash
-# 日本語をデフォルトに
-npm start -- -i your-video.mp4 --lang ja
-
-# または短縮形
-npm start -- -i your-video.mp4 -l ja
-```
-
-これにより、出力JSONに`"lang": "ja"`が含まれます。
-
-### テストモード（最初の5分だけ処理）
-
-長い動画をテストする場合、最初の5分だけを処理できます：
-
-```bash
-npm run start:test
-```
-
-動画ファイルを指定してテストモード：
-
-```bash
-npm start -- --test --input your-video.mp4
-```
-
-または：
-
-```bash
-npm start -- -t -i your-video.mp4
-```
-
-### 評価のみを実行
+#### 評価のみを実行
 
 既にテキストデータがある場合、評価だけを再実行できます：
 
 ```bash
-npm run evaluate output/ai/mulmo_view.json
+npx tsx src/evaluate-only.ts output/ai/mulmo_view.json
 ```
 
 この評価専用コマンドは：
@@ -422,7 +407,7 @@ export async function detectSilence(
 コマンドライン引数で指定できます：
 
 ```bash
-npm start -- --input your-video.mp4
+npm start your-video.mp4
 ```
 
 または、デフォルトを変更する場合は`src/index.ts`を編集：

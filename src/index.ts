@@ -24,10 +24,10 @@ const API_LIMITERS = createApiLimiters(CONCURRENCY);
 const OUTPUT_DIR = 'output';
 
 // コマンドライン引数をパース
-const cliOptions = parseArgs(process.argv.slice(2));
-const INPUT_VIDEO = cliOptions.inputVideo;
-const DEFAULT_LANG = cliOptions.defaultLang;
-const TEST_MODE = cliOptions.testMode;
+const cliOptions = parseArgs(process.argv);
+const INPUT_VIDEO = cliOptions.input;
+const DEFAULT_LANG = cliOptions.lang;
+const TEST_MODE = cliOptions.test;
 const TEST_DURATION = cliOptions.testDuration;
 
 function populateCacheMaps(

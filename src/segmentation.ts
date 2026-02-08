@@ -1,10 +1,10 @@
-import { Segment } from './types.js';
-import { getVideoDuration } from './ffmpeg-utils.js';
-import ffmpeg from 'fluent-ffmpeg';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { Segment } from "./types.js";
+import { getVideoDuration } from "./ffmpeg-utils.js";
+import ffmpeg from "fluent-ffmpeg";
+// import { exec } from "child_process";
+// import { promisify } from "util";
 
-const execAsync = promisify(exec);
+// const execAsync = promisify(exec);
 
 interface SilenceInterval {
   start: number;
@@ -17,17 +17,19 @@ interface SilenceInterval {
 export async function detectSilence(
   videoPath: string,
   noiseThreshold: number = -30, // dB
-  minSilenceDuration: number = 0.5 // 秒
+  minSilenceDuration: number = 0.5, // 秒
 ): Promise<SilenceInterval[]> {
   return new Promise((resolve, reject) => {
     const silences: SilenceInterval[] = [];
     let currentSilence: Partial<SilenceInterval> = {};
 
     const command = ffmpeg(videoPath)
-      .audioFilters(`silencedetect=noise=${noiseThreshold}dB:d=${minSilenceDuration}`)
-      .format('null');
+      .audioFilters(
+        `silencedetect=noise=${noiseThreshold}dB:d=${minSilenceDuration}`,
+      )
+      .format("null");
 
-    command.on('stderr', (stderrLine) => {
+    command.on("stderr", (stderrLine) => {
       // silence_start: 12.3456
       const startMatch = stderrLine.match(/silence_start: ([\d.]+)/);
       if (startMatch) {
@@ -46,15 +48,15 @@ export async function detectSilence(
       }
     });
 
-    command.on('end', () => {
+    command.on("end", () => {
       resolve(silences);
     });
 
-    command.on('error', (err) => {
+    command.on("error", (err) => {
       reject(err);
     });
 
-    command.output('-').run();
+    command.output("-").run();
   });
 }
 
@@ -65,17 +67,17 @@ export async function detectSilence(
 export async function segmentVideoByAudioSilence(
   videoPath: string,
   minDuration: number = 20,
-  maxDuration: number = 120
+  maxDuration: number = 120,
 ): Promise<Segment[]> {
   const totalDuration = await getVideoDuration(videoPath);
 
-  console.log('🔍 Detecting silence in audio...');
+  console.log("🔍 Detecting silence in audio...");
   const silences = await detectSilence(videoPath);
   console.log(`Found ${silences.length} silence intervals`);
 
   if (silences.length === 0) {
     // 無音が検出されない場合は固定時間で分割
-    console.log('⚠️  No silence detected, using fixed-duration segmentation');
+    console.log("⚠️  No silence detected, using fixed-duration segmentation");
     return segmentVideoFixed(videoPath, minDuration, maxDuration);
   }
 
@@ -158,8 +160,8 @@ export async function segmentVideoByAudioSilence(
  */
 export async function segmentVideoFixed(
   videoPath: string,
-  minDuration: number = 20,
-  maxDuration: number = 120
+  _minDuration: number = 20,
+  maxDuration: number = 120,
 ): Promise<Segment[]> {
   const totalDuration = await getVideoDuration(videoPath);
   const segments: Segment[] = [];
@@ -192,7 +194,7 @@ export async function segmentVideoFixed(
 export async function segmentVideo(
   videoPath: string,
   minDuration: number = 20,
-  maxDuration: number = 120
+  maxDuration: number = 120,
 ): Promise<Segment[]> {
   return segmentVideoByAudioSilence(videoPath, minDuration, maxDuration);
 }

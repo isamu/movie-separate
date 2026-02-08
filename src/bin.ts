@@ -7,4 +7,4 @@
  * It processes videos with AI transcription and translation.
  */
 
-import './index.js';
+import "./index.js";

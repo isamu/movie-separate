@@ -1,7 +1,7 @@
-import ffmpeg from 'fluent-ffmpeg';
-import { Segment } from './types.js';
-import { promises as fs } from 'fs';
-import path from 'path';
+import ffmpeg from "fluent-ffmpeg";
+// import { Segment } from "./types.js";
+import { promises as fs } from "fs";
+import path from "path";
 
 export async function getVideoDuration(videoPath: string): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -17,15 +17,15 @@ export async function getVideoDuration(videoPath: string): Promise<number> {
 
 export async function extractAudioFromVideo(
   videoPath: string,
-  outputPath: string
+  outputPath: string,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     ffmpeg(videoPath)
       .output(outputPath)
       .noVideo()
-      .audioCodec('libmp3lame')
-      .on('end', () => resolve())
-      .on('error', (err) => reject(err))
+      .audioCodec("libmp3lame")
+      .on("end", () => resolve())
+      .on("error", (err) => reject(err))
       .run();
   });
 }
@@ -34,17 +34,17 @@ export async function splitVideo(
   inputPath: string,
   outputPath: string,
   start: number,
-  duration: number
+  duration: number,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     ffmpeg(inputPath)
       .setStartTime(start)
       .setDuration(duration)
       .output(outputPath)
-      .videoCodec('copy')
-      .audioCodec('copy')
-      .on('end', () => resolve())
-      .on('error', (err) => reject(err))
+      .videoCodec("copy")
+      .audioCodec("copy")
+      .on("end", () => resolve())
+      .on("error", (err) => reject(err))
       .run();
   });
 }
@@ -53,16 +53,16 @@ export async function splitAudio(
   inputPath: string,
   outputPath: string,
   start: number,
-  duration: number
+  duration: number,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     ffmpeg(inputPath)
       .setStartTime(start)
       .setDuration(duration)
       .output(outputPath)
-      .audioCodec('libmp3lame')
-      .on('end', () => resolve())
-      .on('error', (err) => reject(err))
+      .audioCodec("libmp3lame")
+      .on("end", () => resolve())
+      .on("error", (err) => reject(err))
       .run();
   });
 }
@@ -84,7 +84,7 @@ export async function ensureOutputDir(dirPath: string): Promise<void> {
 export async function generateThumbnail(
   videoPath: string,
   outputPath: string,
-  timestamp: number = 0
+  timestamp: number = 0,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     ffmpeg(videoPath)
@@ -92,9 +92,9 @@ export async function generateThumbnail(
         timestamps: [timestamp],
         filename: path.basename(outputPath),
         folder: path.dirname(outputPath),
-        size: '640x?', // 幅640px、高さは自動
+        size: "640x?", // 幅640px、高さは自動
       })
-      .on('end', () => resolve())
-      .on('error', (err) => reject(err));
+      .on("end", () => resolve())
+      .on("error", (err) => reject(err));
   });
 }

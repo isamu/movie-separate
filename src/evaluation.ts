@@ -1,5 +1,5 @@
-import { Beat } from './types.js';
-import { getOpenAIClient } from './transcription.js';
+import { Beat } from "./types.js";
+import { getOpenAIClient } from "./transcription.js";
 
 // 評価入力データの型定義
 interface SegmentInput {
@@ -20,64 +20,66 @@ interface SegmentEvaluation {
 
 // Structured Outputs用のスキーマ
 const evaluationSchema = {
-  type: 'object',
+  type: "object",
   properties: {
     evaluations: {
-      type: 'array',
+      type: "array",
       items: {
-        type: 'object',
+        type: "object",
         properties: {
           segmentNumber: {
-            type: 'number',
-            description: 'セグメント番号'
+            type: "number",
+            description: "セグメント番号",
           },
           importance: {
-            type: 'number',
-            description: '重要度スコア (0-10)',
+            type: "number",
+            description: "重要度スコア (0-10)",
             minimum: 0,
-            maximum: 10
+            maximum: 10,
           },
           category: {
-            type: 'string',
-            description: 'カテゴリ',
+            type: "string",
+            description: "カテゴリ",
             enum: [
-              'key_point',
-              'introduction',
-              'explanation',
-              'example',
-              'discussion',
-              'conclusion',
-              'tangent',
-              'transition'
-            ]
+              "key_point",
+              "introduction",
+              "explanation",
+              "example",
+              "discussion",
+              "conclusion",
+              "tangent",
+              "transition",
+            ],
           },
           summary: {
-            type: 'string',
-            description: '日本語で1-2文の要約'
-          }
+            type: "string",
+            description: "日本語で1-2文の要約",
+          },
         },
-        required: ['segmentNumber', 'importance', 'category', 'summary'],
-        additionalProperties: false
-      }
-    }
+        required: ["segmentNumber", "importance", "category", "summary"],
+        additionalProperties: false,
+      },
+    },
   },
-  required: ['evaluations'],
-  additionalProperties: false
+  required: ["evaluations"],
+  additionalProperties: false,
 };
 
 /**
  * 全セグメントを一括で評価
  */
-export async function evaluateSegments(beats: Beat[]): Promise<Map<number, SegmentEvaluation>> {
+export async function evaluateSegments(
+  beats: Beat[],
+): Promise<Map<number, SegmentEvaluation>> {
   const client = getOpenAIClient();
 
   // 入力データを準備
   const segments: SegmentInput[] = beats.map((beat, index) => ({
     segmentNumber: index + 1,
-    speaker: beat.speaker || 'Unknown',
+    speaker: beat.speaker || "Unknown",
     text: beat.multiLinguals.ja,
     startTime: beat.startTime || 0,
-    duration: beat.duration || 0
+    duration: beat.duration || 0,
   }));
 
   // プロンプトを構築
@@ -88,32 +90,33 @@ export async function evaluateSegments(beats: Beat[]): Promise<Map<number, Segme
 
   // GPT-4oに送信（response_format使用）
   const response = await client.chat.completions.create({
-    model: 'gpt-4o',
+    model: "gpt-4o",
     messages: [
       {
-        role: 'system',
-        content: 'あなたは動画コンテンツの重要度を評価する専門家です。各セグメントの重要性を正確に判定してください。重要：すべてのセグメントに同じスコアを付けないでください。内容に応じて0から10まで幅広くスコアを使い分け、明確なメリハリをつけてください。'
+        role: "system",
+        content:
+          "あなたは動画コンテンツの重要度を評価する専門家です。各セグメントの重要性を正確に判定してください。重要：すべてのセグメントに同じスコアを付けないでください。内容に応じて0から10まで幅広くスコアを使い分け、明確なメリハリをつけてください。",
       },
       {
-        role: 'user',
-        content: prompt
-      }
+        role: "user",
+        content: prompt,
+      },
     ],
     response_format: {
-      type: 'json_schema',
+      type: "json_schema",
       json_schema: {
-        name: 'segment_evaluation',
+        name: "segment_evaluation",
         strict: true,
-        schema: evaluationSchema
-      }
+        schema: evaluationSchema,
+      },
     },
-    temperature: 0.5 // バリエーションと一貫性のバランス
+    temperature: 0.5, // バリエーションと一貫性のバランス
   });
 
   // レスポンスをパース
   const content = response.choices[0].message.content;
   if (!content) {
-    throw new Error('Empty response from GPT-4o');
+    throw new Error("Empty response from GPT-4o");
   }
 
   const result = JSON.parse(content);
@@ -199,5 +202,5 @@ function buildEvaluationPrompt(segments: SegmentInput[]): string {
 function formatTime(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
-  return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  return `${minutes}:${secs.toString().padStart(2, "0")}`;
 }

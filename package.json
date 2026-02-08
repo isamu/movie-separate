@@ -47,16 +47,18 @@
     "lib": "lib"
   },
   "devDependencies": {
-    "@types/node": "^24.10.1",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.0.5",
     "@types/p-limit": "^2.2.0",
     "@types/yargs": "^17.0.35",
-    "eslint": "^9.39.1",
+    "eslint": "^10.0.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
-    "eslint-plugin-sonarjs": "^3.0.5",
-    "tsx": "^4.20.6",
+    "eslint-plugin-sonarjs": "^3.0.6",
+    "globals": "^17.3.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.46.3"
+    "typescript-eslint": "^8.54.0"
   },
   "dependencies": {
     "@types/fluent-ffmpeg": "^2.1.28",

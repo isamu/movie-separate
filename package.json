@@ -14,8 +14,8 @@
     "start": "tsx src/bin.ts",
     "evaluate": "tsx src/evaluate-only.ts",
     "digest": "tsx src/digest.ts",
-    "test": "tsx --test 'test/**/*_test.ts'",
-    "test:watch": "tsx --test --watch 'test/**/*_test.ts'"
+    "test": "tsx --test test/**/*_test.ts",
+    "test:watch": "tsx --test --watch test/**/*_test.ts"
   },
   "keywords": [
     "video",

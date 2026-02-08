@@ -4,11 +4,11 @@
  * 既存のmulmo_view.jsonから評価のみを実行
  */
 
-import { promises as fs } from 'fs';
-import path from 'path';
-import { Output, Beat } from './types.js';
-import { getOpenAIClient } from './transcription.js';
-import dotenv from 'dotenv';
+import { promises as fs } from "fs";
+// import path from "path";
+import { Output, Beat } from "./types.js";
+import { getOpenAIClient } from "./transcription.js";
+import dotenv from "dotenv";
 
 dotenv.config();
 
@@ -31,64 +31,66 @@ interface SegmentEvaluation {
 
 // Structured Outputs用のスキーマ
 const evaluationSchema = {
-  type: 'object',
+  type: "object",
   properties: {
     evaluations: {
-      type: 'array',
+      type: "array",
       items: {
-        type: 'object',
+        type: "object",
         properties: {
           segmentNumber: {
-            type: 'number',
-            description: 'セグメント番号'
+            type: "number",
+            description: "セグメント番号",
           },
           importance: {
-            type: 'number',
-            description: '重要度スコア (0-10)',
+            type: "number",
+            description: "重要度スコア (0-10)",
             minimum: 0,
-            maximum: 10
+            maximum: 10,
           },
           category: {
-            type: 'string',
-            description: 'カテゴリ',
+            type: "string",
+            description: "カテゴリ",
             enum: [
-              'key_point',
-              'introduction',
-              'explanation',
-              'example',
-              'discussion',
-              'conclusion',
-              'tangent',
-              'transition'
-            ]
+              "key_point",
+              "introduction",
+              "explanation",
+              "example",
+              "discussion",
+              "conclusion",
+              "tangent",
+              "transition",
+            ],
           },
           summary: {
-            type: 'string',
-            description: '日本語で1-2文の要約'
-          }
+            type: "string",
+            description: "日本語で1-2文の要約",
+          },
         },
-        required: ['segmentNumber', 'importance', 'category', 'summary'],
-        additionalProperties: false
-      }
-    }
+        required: ["segmentNumber", "importance", "category", "summary"],
+        additionalProperties: false,
+      },
+    },
   },
-  required: ['evaluations'],
-  additionalProperties: false
+  required: ["evaluations"],
+  additionalProperties: false,
 };
 
 /**
  * 全セグメントを一括で評価
  */
-async function evaluateSegments(beats: Beat[]): Promise<Map<number, SegmentEvaluation>> {
+async function evaluateSegments(
+  beats: Beat[],
+): Promise<Map<number, SegmentEvaluation>> {
   const client = getOpenAIClient();
 
   // 入力データを準備（オリジナル言語=日本語を使用）
   const segments: SegmentInput[] = beats.map((beat, index) => ({
     segmentNumber: index + 1,
-    speaker: beat.speaker || 'Unknown',
+    speaker: beat.speaker || "Unknown",
     text: beat.multiLinguals.ja, // 日本語テキストを使用
     startTime: beat.startTime || 0,
-    duration: beat.duration || 0
+    duration: beat.duration || 0,
   }));
 
   // プロンプトを構築
@@ -99,10 +101,10 @@ async function evaluateSegments(beats: Beat[]): Promise<Map<number, SegmentEvalu
 
   // GPT-4oに送信（response_format使用）
   const response = await client.chat.completions.create({
-    model: 'gpt-4o',
+    model: "gpt-4o",
     messages: [
       {
-        role: 'system',
+        role: "system",
         content: `あなたは対談・インタビュー動画の重要度を評価する専門家です。
 
 各セグメントの内容を分析し、視聴者にとっての価値を判定してください。
@@ -117,28 +119,28 @@ async function evaluateSegments(beats: Beat[]): Promise<Map<number, SegmentEvalu
 これらの要素を含むセグメントには高いスコア（8-10点）を付けてください。
 逆に、挨拶や雑談、一般的な説明には低いスコア（0-3点）を付けてください。
 
-必ず0から10まで幅広くスコアを使い分け、明確なメリハリをつけてください。`
+必ず0から10まで幅広くスコアを使い分け、明確なメリハリをつけてください。`,
       },
       {
-        role: 'user',
-        content: prompt
-      }
+        role: "user",
+        content: prompt,
+      },
     ],
     response_format: {
-      type: 'json_schema',
+      type: "json_schema",
       json_schema: {
-        name: 'segment_evaluation',
+        name: "segment_evaluation",
         strict: true,
-        schema: evaluationSchema
-      }
+        schema: evaluationSchema,
+      },
     },
-    temperature: 0.9 // より多様な評価を得る
+    temperature: 0.9, // より多様な評価を得る
   });
 
   // レスポンスをパース
   const content = response.choices[0].message.content;
   if (!content) {
-    throw new Error('Empty response from GPT-4o');
+    throw new Error("Empty response from GPT-4o");
   }
 
   const result = JSON.parse(content);
@@ -239,7 +241,7 @@ function buildEvaluationPrompt(segments: SegmentInput[]): string {
 function formatTime(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
-  return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  return `${minutes}:${secs.toString().padStart(2, "0")}`;
 }
 
 /**
@@ -249,28 +251,28 @@ async function main() {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
-    console.error('Usage: npm run evaluate <path-to-mulmo_view.json>');
-    console.error('Example: npm run evaluate output/ai/mulmo_view.json');
+    console.error("Usage: npm run evaluate <path-to-mulmo_view.json>");
+    console.error("Example: npm run evaluate output/ai/mulmo_view.json");
     process.exit(1);
   }
 
   const inputPath = args[0];
 
-  console.log('🔍 Loading existing data...');
+  console.log("🔍 Loading existing data...");
 
   // JSONを読み込み
-  const jsonContent = await fs.readFile(inputPath, 'utf-8');
+  const jsonContent = await fs.readFile(inputPath, "utf-8");
   const data: Output = JSON.parse(jsonContent);
 
   // langフィールドがない場合はデフォルト値を設定
   if (!data.lang) {
-    data.lang = 'en';
+    data.lang = "en";
   }
 
   console.log(`📊 Found ${data.beats.length} segments`);
 
   // 評価を実行
-  console.log('\n📊 Starting evaluation...\n');
+  console.log("\n📊 Starting evaluation...\n");
   const evaluations = await evaluateSegments(data.beats);
 
   // 評価結果を各Beatに追加
@@ -285,17 +287,33 @@ async function main() {
   });
 
   // 統計情報を表示
-  const highImportance = data.beats.filter(b => (b.importance || 0) >= 8).length;
-  const mediumHighImportance = data.beats.filter(b => (b.importance || 0) >= 6 && (b.importance || 0) < 8).length;
-  const mediumImportance = data.beats.filter(b => (b.importance || 0) >= 4 && (b.importance || 0) < 6).length;
-  const lowImportance = data.beats.filter(b => (b.importance || 0) < 4).length;
+  const highImportance = data.beats.filter(
+    (b) => (b.importance || 0) >= 8,
+  ).length;
+  const mediumHighImportance = data.beats.filter(
+    (b) => (b.importance || 0) >= 6 && (b.importance || 0) < 8,
+  ).length;
+  const mediumImportance = data.beats.filter(
+    (b) => (b.importance || 0) >= 4 && (b.importance || 0) < 6,
+  ).length;
+  const lowImportance = data.beats.filter(
+    (b) => (b.importance || 0) < 4,
+  ).length;
 
-  console.log('\n✅ Evaluation complete!');
+  console.log("\n✅ Evaluation complete!");
   console.log(`\n📈 Importance Distribution:`);
-  console.log(`   Very High (8-10): ${highImportance} segments (${(highImportance / data.beats.length * 100).toFixed(1)}%)`);
-  console.log(`   High (6-7): ${mediumHighImportance} segments (${(mediumHighImportance / data.beats.length * 100).toFixed(1)}%)`);
-  console.log(`   Medium (4-5): ${mediumImportance} segments (${(mediumImportance / data.beats.length * 100).toFixed(1)}%)`);
-  console.log(`   Low (0-3): ${lowImportance} segments (${(lowImportance / data.beats.length * 100).toFixed(1)}%)`);
+  console.log(
+    `   Very High (8-10): ${highImportance} segments (${((highImportance / data.beats.length) * 100).toFixed(1)}%)`,
+  );
+  console.log(
+    `   High (6-7): ${mediumHighImportance} segments (${((mediumHighImportance / data.beats.length) * 100).toFixed(1)}%)`,
+  );
+  console.log(
+    `   Medium (4-5): ${mediumImportance} segments (${((mediumImportance / data.beats.length) * 100).toFixed(1)}%)`,
+  );
+  console.log(
+    `   Low (0-3): ${lowImportance} segments (${((lowImportance / data.beats.length) * 100).toFixed(1)}%)`,
+  );
 
   // スコアの詳細分布
   const scoreCounts = new Map<number, number>();
@@ -308,13 +326,13 @@ async function main() {
   Array.from({ length: 11 }, (_, i) => 10 - i).forEach((score) => {
     const count = scoreCounts.get(score) || 0;
     if (count > 0) {
-      const bar = '█'.repeat(Math.ceil(count / data.beats.length * 50));
+      const bar = "█".repeat(Math.ceil((count / data.beats.length) * 50));
       console.log(`   ${score.toString().padStart(2)}: ${bar} ${count}`);
     }
   });
 
   // 保存
-  await fs.writeFile(inputPath, JSON.stringify(data, null, 2), 'utf-8');
+  await fs.writeFile(inputPath, JSON.stringify(data, null, 2), "utf-8");
   console.log(`\n💾 Saved updated data to ${inputPath}`);
 
   // 高スコアのセグメントをプレビュー
@@ -326,14 +344,16 @@ async function main() {
   if (highlights.length > 0) {
     console.log(`\n🎯 Top Highlights (importance >= 8):\n`);
     highlights.slice(0, 10).forEach(({ beat, index }, i) => {
-      console.log(`${i + 1}. [Segment ${index}] Score: ${beat.importance} - ${beat.category}`);
+      console.log(
+        `${i + 1}. [Segment ${index}] Score: ${beat.importance} - ${beat.category}`,
+      );
       console.log(`   ${beat.summary}`);
-      console.log('');
+      console.log("");
     });
   }
 }
 
 main().catch((error) => {
-  console.error('❌ Error:', error);
+  console.error("❌ Error:", error);
   process.exit(1);
 });

@@ -14,8 +14,8 @@
     "start": "tsx src/bin.ts",
     "evaluate": "tsx src/evaluate-only.ts",
     "digest": "tsx src/digest.ts",
-    "test": "tsx --test 'test/**/*_test.ts'",
-    "test:watch": "tsx --test --watch 'test/**/*_test.ts'"
+    "test": "tsx --test test/**/*_test.ts",
+    "test:watch": "tsx --test --watch test/**/*_test.ts"
   },
   "keywords": [
     "video",
@@ -54,6 +54,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
     "eslint-plugin-sonarjs": "^3.0.5",
+    "prettier": "^3.8.1",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.3"

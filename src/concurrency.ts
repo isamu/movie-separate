@@ -2,7 +2,7 @@
  * 並列処理制御ユーティリティ
  * p-limitを使用してAPI呼び出しを制限する
  */
-import pLimit from 'p-limit';
+import pLimit from "p-limit";
 
 /**
  * API並列実行数の設定
@@ -19,10 +19,10 @@ export interface ConcurrencyConfig {
  */
 export function getConcurrencyConfig(): ConcurrencyConfig {
   return {
-    whisper: parseInt(process.env.WHISPER_CONCURRENCY || '3', 10),
-    translation: parseInt(process.env.TRANSLATION_CONCURRENCY || '10', 10),
-    tts: parseInt(process.env.TTS_CONCURRENCY || '3', 10),
-    speakerId: parseInt(process.env.SPEAKER_ID_CONCURRENCY || '10', 10),
+    whisper: parseInt(process.env.WHISPER_CONCURRENCY || "3", 10),
+    translation: parseInt(process.env.TRANSLATION_CONCURRENCY || "10", 10),
+    tts: parseInt(process.env.TTS_CONCURRENCY || "3", 10),
+    speakerId: parseInt(process.env.SPEAKER_ID_CONCURRENCY || "10", 10),
   };
 }
 

@@ -1,6 +1,6 @@
-import OpenAI from 'openai';
-import { createReadStream } from 'fs';
-import { Beat, MultiLinguals } from './types.js';
+import OpenAI from "openai";
+import { createReadStream } from "fs";
+import { MultiLinguals } from "./types.js";
 
 // OpenAIクライアントを遅延初期化
 let openai: OpenAI;
@@ -9,7 +9,7 @@ export function getOpenAIClient(): OpenAI {
   if (!openai) {
     if (!process.env.OPENAI_API_KEY) {
       throw new Error(
-        'Missing OPENAI_API_KEY environment variable. Please create a .env file with your OpenAI API key.'
+        "Missing OPENAI_API_KEY environment variable. Please create a .env file with your OpenAI API key.",
       );
     }
     openai = new OpenAI({
@@ -35,12 +35,12 @@ export interface TranscriptionWithTimestamps {
  */
 export async function transcribeAudio(
   audioPath: string,
-  language: string = 'en'
+  language: string = "en",
 ): Promise<string> {
   const client = getOpenAIClient();
   const transcription = await client.audio.transcriptions.create({
     file: createReadStream(audioPath),
-    model: 'whisper-1',
+    model: "whisper-1",
     language: language,
   });
 
@@ -51,15 +51,15 @@ export async function transcribeAudio(
  * Whisper APIで音声を文字起こし（verbose_json形式でタイムスタンプ取得）
  */
 export async function transcribeAudioWithTimestamps(
-  audioPath: string
+  audioPath: string,
 ): Promise<TranscriptionWithTimestamps> {
   const client = getOpenAIClient();
   const transcription = await client.audio.transcriptions.create({
     file: createReadStream(audioPath),
-    model: 'whisper-1',
-    language: 'ja',
-    response_format: 'verbose_json',
-    timestamp_granularities: ['segment'],
+    model: "whisper-1",
+    language: "ja",
+    response_format: "verbose_json",
+    timestamp_granularities: ["segment"],
   });
 
   return {
@@ -80,15 +80,15 @@ export interface SpeakerSegment {
  * 会話のパターンや口調から話者を推定
  */
 export async function identifySpeakers(
-  transcriptionText: string
+  transcriptionText: string,
 ): Promise<SpeakerSegment[]> {
   try {
     const client = getOpenAIClient();
     const completion = await client.chat.completions.create({
-      model: 'gpt-4o',
+      model: "gpt-4o",
       messages: [
         {
-          role: 'system',
+          role: "system",
           content: `You are an expert at analyzing conversation transcripts and identifying different speakers.
 Parse the given Japanese conversation and separate it into individual utterances with speaker labels.
 Return ONLY a valid JSON object with a "speakers" array containing objects with "speaker" and "text" fields.
@@ -104,23 +104,25 @@ Example format:
 }`,
         },
         {
-          role: 'user',
+          role: "user",
           content: `Please analyze this conversation transcript and identify the different speakers:\n\n${transcriptionText}`,
         },
       ],
-      response_format: { type: 'json_object' },
+      response_format: { type: "json_object" },
     });
 
-    const result = JSON.parse(completion.choices[0].message.content || '{"speakers":[]}');
+    const result = JSON.parse(
+      completion.choices[0].message.content || '{"speakers":[]}',
+    );
 
     if (!result.speakers || result.speakers.length === 0) {
-      return [{ speaker: '話者A', text: transcriptionText }];
+      return [{ speaker: "話者A", text: transcriptionText }];
     }
 
     return result.speakers;
   } catch (error) {
-    console.warn('Failed to identify speakers:', error);
-    return [{ speaker: '話者A', text: transcriptionText }];
+    console.warn("Failed to identify speakers:", error);
+    return [{ speaker: "話者A", text: transcriptionText }];
   }
 }
 
@@ -128,7 +130,7 @@ Example format:
  * タイムスタンプ付き文字起こしから主要な話者を推定
  */
 export async function identifyMainSpeaker(
-  transcription: TranscriptionWithTimestamps
+  transcription: TranscriptionWithTimestamps,
 ): Promise<string> {
   const speakerSegments = await identifySpeakers(transcription.text);
 
@@ -136,7 +138,7 @@ export async function identifyMainSpeaker(
     return speakerSegments[0].speaker;
   }
 
-  return '話者A';
+  return "話者A";
 }
 
 /**
@@ -148,20 +150,20 @@ export async function identifyMainSpeaker(
 export async function translateText(
   text: string,
   fromLang: string,
-  toLang: string
+  toLang: string,
 ): Promise<string> {
   try {
     const client = getOpenAIClient();
-    const langNames = { en: 'English', ja: 'Japanese' };
+    const langNames = { en: "English", ja: "Japanese" };
     const completion = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: "gpt-4o-mini",
       messages: [
         {
-          role: 'system',
+          role: "system",
           content: `You are a professional translator. Translate the given ${langNames[fromLang as keyof typeof langNames]} text to natural ${langNames[toLang as keyof typeof langNames]}. Only return the translated text, nothing else.`,
         },
         {
-          role: 'user',
+          role: "user",
           content: text,
         },
       ],
@@ -182,11 +184,11 @@ export async function translateText(
  */
 export async function transcribeAudioBilingual(
   audioPath: string,
-  sourceLang: string = 'en',
-  translationCache?: Map<string, string>
+  sourceLang: string = "en",
+  translationCache?: Map<string, string>,
 ): Promise<MultiLinguals> {
   const sourceText = await transcribeAudio(audioPath, sourceLang);
-  const targetLang = sourceLang === 'en' ? 'ja' : 'en';
+  const targetLang = sourceLang === "en" ? "ja" : "en";
 
   const getCachedTranslation = () => {
     console.log(`    ♻️  Using cached translation`);
@@ -202,7 +204,7 @@ export async function transcribeAudioBilingual(
     ? getCachedTranslation()
     : await getNewTranslation();
 
-  return sourceLang === 'en'
+  return sourceLang === "en"
     ? { en: sourceText, ja: translatedText }
     : { ja: sourceText, en: translatedText };
 }
@@ -213,25 +215,27 @@ export async function transcribeAudioBilingual(
 export async function textToSpeech(
   text: string,
   outputPath: string,
-  language: 'ja' | 'en' = 'ja'
+  language: "ja" | "en" = "ja",
 ): Promise<void> {
   try {
     const client = getOpenAIClient();
 
     // 言語に応じて音声を選択
-    const voice = language === 'ja' ? 'alloy' : 'alloy'; // OpenAI TTSは多言語対応
+    const voice = language === "ja" ? "alloy" : "alloy"; // OpenAI TTSは多言語対応
 
     const mp3 = await client.audio.speech.create({
-      model: 'tts-1',
+      model: "tts-1",
       voice: voice,
       input: text,
     });
 
     const buffer = Buffer.from(await mp3.arrayBuffer());
-    const fs = await import('fs/promises');
+    const fs = await import("fs/promises");
     await fs.writeFile(outputPath, buffer);
 
-    console.log(`    🔊 Generated ${language.toUpperCase()} audio: ${outputPath}`);
+    console.log(
+      `    🔊 Generated ${language.toUpperCase()} audio: ${outputPath}`,
+    );
   } catch (error) {
     console.warn(`Failed to generate TTS for ${language}:`, error);
     throw error;

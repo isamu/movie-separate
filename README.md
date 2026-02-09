@@ -1,3 +1,4 @@
+[![npm version](https://badge.fury.io/js/mulmo-movie.svg)](https://badge.fury.io/js/mulmo-movie)
 # mulmo-movie
 
 AI-powered video processing tool with transcription, translation, and speaker identification.

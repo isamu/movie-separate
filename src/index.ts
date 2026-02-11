@@ -20,7 +20,7 @@ import { Beat, Output, MultiLinguals } from "./types.js";
 import { parseArgs } from "./cli.js";
 import { getConcurrencyConfig, createApiLimiters } from "./concurrency.js";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const CONCURRENCY = getConcurrencyConfig();
 const API_LIMITERS = createApiLimiters(CONCURRENCY);

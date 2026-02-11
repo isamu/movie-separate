@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { createReadStream } from "fs";
+import { writeFile } from "fs/promises";
 import { MultiLinguals } from "./types.js";
 
 // OpenAIクライアントを遅延初期化
@@ -230,8 +231,7 @@ export async function textToSpeech(
     });
 
     const buffer = Buffer.from(await mp3.arrayBuffer());
-    const fs = await import("fs/promises");
-    await fs.writeFile(outputPath, buffer);
+    await writeFile(outputPath, buffer);
 
     console.log(
       `    🔊 Generated ${language.toUpperCase()} audio: ${outputPath}`,

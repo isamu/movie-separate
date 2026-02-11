@@ -10,7 +10,7 @@ import { Output, Beat } from "./types.js";
 import { getOpenAIClient } from "./transcription.js";
 import dotenv from "dotenv";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 // 評価入力データの型定義
 interface SegmentInput {

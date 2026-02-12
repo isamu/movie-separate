@@ -1,6 +1,21 @@
 [![npm version](https://badge.fury.io/js/mulmo-movie.svg)](https://badge.fury.io/js/mulmo-movie)
 # mulmo-movie
 
+> **Note:** 動画処理を含む一般的な用途には [MulmoCast-Slides (`@mulmocast/slide`)](https://github.com/receptron/MulmoCast-Slides) の使用を推奨します。MulmoCast-Slides は動画の無音検出・セグメント分割・文字起こし・翻訳・TTS に加え、PPTX/PDF/Markdown/Keynote 入力、LLM ナレーション生成、ExtendedMulmoScript 出力、MulmoViewer バンドル生成にも対応しています。
+
+## mulmo-movie 固有の機能（MulmoCast-Slides にないもの）
+
+| 機能 | 説明 |
+|------|------|
+| **話者識別** | GPT-4o で会話から話者を自動識別 |
+| **重要度スコアリング** | GPT-4o で各セグメントに 0-10 の重要度スコア・カテゴリ・要約を自動付与 |
+| **ダイジェスト生成** | 重要度スコアに基づいて重要セグメントのみを抽出 |
+| **テストモード** | `--test` で最初の 5 分のみ処理するプレビュー機能 |
+
+これらの機能が必要な場合のみ mulmo-movie を使用してください。
+
+---
+
 AI-powered video processing tool with transcription, translation, and speaker identification.
 
 対談動画を話の内容に応じて自動分割し、音声文字起こしと話者識別を行うツールです。

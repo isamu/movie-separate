@@ -11,7 +11,7 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "prepublishOnly": "npm run build",
-    "lint": "eslint src",
+    "lint": "eslint src test",
     "start": "tsx src/bin.ts",
     "evaluate": "tsx src/evaluate-only.ts",
     "digest": "tsx src/digest.ts",

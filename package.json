@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "prepublishOnly": "npm run build",
     "lint": "eslint src",
     "start": "tsx src/bin.ts",

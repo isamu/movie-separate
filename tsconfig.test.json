@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    /* The base config emits a package: rootDir pins it to src/ and declaration/declarationMap
+       describe the published output. None of that applies to a type-only pass over the tests. */
+    "rootDir": ".",
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false
+  },
+  "include": ["test/**/*.ts"],
+  "exclude": ["node_modules", "lib"]
+}

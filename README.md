@@ -37,7 +37,7 @@ AI-powered video processing tool with transcription, translation, and speaker id
 
 ## 必要な環境
 
-- Node.js 18以上
+- Node.js 22.12以上
 - ffmpeg（音声・動画処理用）
 - OpenAI APIキー
 
